@@ -24,11 +24,6 @@ Password: lvl
 For each role, a demo user has been added. To use them, just change their password when logged in as the admin.
 
 
-
-After login in as the administrator, you may have to change the file system paths:
-admin/settings/file-system
-
-
 You can change the test@test email adresses here:
 www.sitename.com/user/1/edit
 www.sitename.com/admin/build/contact/edit/1
@@ -41,7 +36,7 @@ Additional info:
   profile already contains a complete Drupal 6.22 install
 - You need to create a database for your website. (see http://drupal.org/getting-started/6/install/create-database)
 - Does not accept database prefixes.
-
+- Applied patches can be found in the "patches" directory (in the root, and in sites/all - both contain the same patch files)
 
 
 
