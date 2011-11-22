@@ -1,0 +1,47 @@
+A Drupal 6.22 / MediaMosa install profile.
+
+
+http://www.mediamosa.org/
+http://drupal.org/
+http://drupal.org/project/demo_profile
+
+
+The LvL profile comes with an install profile: a complete package containing all required files to get started with MediaMosa LvL. 
+
+Just upload the files to the root directory of your webserver.
+
+Then follow the usual steps for installing Drupal (http://drupal.org/getting-started/install). 
+
+When asked to choose a profile, select the "LvL MediaMosa" install profile 
+
+
+
+The default username and password of the admin user is:
+
+Username: LvL  
+Password: lvl
+
+For each role, a demo user has been added. To use them, just change their password when logged in as the admin.
+
+
+
+After login in as the administrator, you may have to change the file system paths:
+admin/settings/file-system
+
+
+You can change the test@test email adresses here:
+www.sitename.com/user/1/edit
+www.sitename.com/admin/build/contact/edit/1
+www.sitename.com/admin/settings/site-information
+
+
+Additional info: 
+
+- You don't need to download Drupal from drupal.org separately since this
+  profile already contains a complete Drupal 6.22 install
+- You need to create a database for your website. (see http://drupal.org/getting-started/6/install/create-database)
+- Does not accept database prefixes.
+
+
+
+

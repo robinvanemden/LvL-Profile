@@ -1,0 +1,748 @@
+<?php
+
+/**
+ * @file
+ * The Select (or other) module.
+ */
+
+/**
+ * Implementation of hook_theme().
+ */
+function select_or_other_theme() {
+  return array(
+    'select_or_other' => array(
+      'arguments' => array(
+        'element' => NULL,
+      ),
+    ),
+    'select_or_other_none' => array(
+      'arguments' => array(
+        'field' => NULL,
+      ),
+    ),
+  );
+}
+
+/**
+ * Theme a Select (or other) element.
+ */
+function theme_select_or_other($element) {
+  // Load the JS file to hide/show the 'other' box when needed.
+  drupal_add_js(drupal_get_path('module', 'select_or_other') .'/select_or_other.js');
+  $output = "<div class=\"select-or-other form-item\">\n";
+  $output .= drupal_render($element) . "\n";
+  // Render #description below both elements.
+  if (!empty($element['#description'])) {
+    $output .= ' <div class="description">' . $element['#description'] . "</div>\n";
+    unset($element['#description']);
+  }
+  $output .= "</div>\n";
+  return $output;
+}
+
+/**
+ * Implementation of hook_elements().
+ */
+function select_or_other_elements() {
+  $type['select_or_other'] = array(
+    '#select_type' => 'select',
+    '#input' => TRUE,
+    '#size' => 0,
+    '#multiple' => FALSE,
+    '#disabled' => FALSE,
+    '#default_value' => NULL,
+    '#process' => array('select_or_other_process'),
+    '#element_validate' => array('select_or_other_element_validate'),
+    '#other' => t('Other'),
+    '#theme' => 'select_or_other',
+  );
+  $type['checkboxes'] = array(
+    '#process' => array('select_or_other_expand_checkboxes'),
+  );
+  return $type;
+}
+
+/**
+ * Implementation of form_type_hook_value().
+ */
+function form_type_select_or_other_value($element, $edit = FALSE) {
+  if (func_num_args() == 1) {
+     return $element['#default_value'];
+  }
+}
+
+/**
+ * Process callback for a Select (or other) element.
+ */
+function select_or_other_process($element, $edit, &$form_state, $form) {
+  $element['#tree'] = TRUE;
+  $element['#processed'] = TRUE;
+  unset($element['#type']);
+
+  // Create the main select box
+  // Note that #title, #default_value, #disabled, #multiple, #options, #attributes,
+  // #required, and #size as passed to the select box from the main element.
+  $element['select'] = array(
+    '#type' => $element['#select_type'],
+    '#title' => $element['#title'],
+    '#default_value' => $element['#default_value'],
+    '#disabled' => $element['#disabled'],
+    '#multiple' => $element['#multiple'],
+    '#required' => $element['#required'],
+    '#size' => $element['#size'],
+    '#options' => $element['#options'],
+    '#attributes' => $element['#attributes'],
+    '#weight' => 10,
+
+    // The following values were set by the content module and need
+    // to be passed down to the nested element.
+    '#field_name' => $element['#field_name'],
+    '#delta' => $element['#delta'],
+    '#columns' => $element['#columns'],
+
+  );
+
+  // If working with checkboxes, create a property so we can identify it in a
+  // process function.
+  if ($element['#select_type'] == 'checkboxes') {
+    $element['select']['#select_or_other_checkboxes'] = TRUE;
+  }
+
+  // Remove the default value on the container level so it doesn't get rendered there.
+  $element['#value'] = NULL;
+  // Remove the required parameter so FAPI doesn't force us to fill in the textfield.
+  $element['#required'] = NULL;
+  // Allows other modules to update the #title_display options.
+  $element['#pre_render'] = array('_select_or_other_title_display');
+
+  // Now we must handle the default values.
+  $other_default = array();
+
+  // Easier to work with the defaults if they are an array.
+  if (!is_array($element['select']['#default_value'])) {
+    $element['select']['#default_value'] = array(
+      $element['select']['#default_value'],
+    );
+  }
+
+  // Process the default value.
+  foreach ($element['select']['#default_value'] as $key => $val) {
+    if ($val
+        && isset($element['select']['#options'])
+        && is_array($element['select']['#options'])
+        && !select_or_other_multi_array_key_exists($val, $element['select']['#options'])
+        && !in_array($val, $element['select']['#options'])) {
+      // Not a valid option - add it to 'other'.
+      if ($element['#other_unknown_defaults'] == 'other') {
+        if ($element['#other_delimiter']) {
+          $other_default[] = $val;
+        }
+        else {
+          $other_default = array($val);
+        }
+        // Remove it from the select's default value.
+        unset($element['select']['#default_value'][$key]);
+      }
+      // Also checks 'available' because if that setting is newly set, after data is already stored, it should behave like 'append'.
+      elseif ($element['#other_unknown_defaults'] == 'append' || $element['#other_unknown_defaults'] == 'available') {
+        $element['select']['#options'][$val] = $val;
+      }
+
+    }
+  }
+
+  // If the expected default value is a string/integer, remove the array wrapper.
+  if ($element['#select_type'] == 'radios' || ($element['#select_type'] == 'select' && !$element['#multiple'])) {
+    $element['select']['#default_value'] = reset($element['select']['#default_value']);
+  }
+
+  $other_default_string = '';
+  if (!empty($other_default)) {
+    $other_default_string = implode($element['#other_delimiter'], $other_default);
+    if (is_array($element['select']['#default_value'])) {
+      $element['select']['#default_value'][] = 'select_or_other';
+    }
+    else {
+      $element['select']['#default_value'] = 'select_or_other';
+    }
+  }
+
+  // Add in the 'other' option.
+  $element['select']['#options']['select_or_other'] = $element['#other'];
+
+  // Create the 'other' textfield.
+  $element['other'] = array(
+    '#type' => 'textfield',
+    '#weight' => 20,
+    '#default_value' => $other_default_string,
+    '#disabled' => $element['#disabled'],
+    '#attributes' => $element['#attributes'],
+  );
+
+  // Populate properties set specifically as #select_property or #other_property
+  $sub_elements = array('select', 'other');
+  foreach ($sub_elements as $sub_element) {
+    foreach ($element as $key => $value) {
+      if (strpos($key, '#'. $sub_element .'_') === 0) {
+        $element[$sub_element][str_replace('#'. $sub_element .'_', '#', $key)] = $value;
+      }
+    }
+    // Also add in a custom class for each.
+    if (isset($element[$sub_element]['#attributes']['class'])) {
+      $element[$sub_element]['#attributes']['class'] .= " select-or-other-". $sub_element;
+    }
+    else {
+      $element[$sub_element]['#attributes']['class'] = "select-or-other-". $sub_element;
+    }
+  }
+  return $element;
+}
+
+/**
+ * Mimics Drupal 7 #title_display attribute, which removes the #title
+ * attribute. Using the #pre_render callback ensures that the #title
+ * attribute is still available during validation.
+ *
+ * Please revert the patch at http://drupal.org/node/740522 when upgrading to
+ * Drupal 7.
+ */
+function _select_or_other_title_display($element) {
+  if (isset($element['#title_display']) && $element['#title_display'] === 'none') {
+    $element['select']['#title'] = NULL;
+  }
+  return $element;
+}
+
+ /**
+ * Element process callback for Select (or other) checkboxes.
+ */
+function select_or_other_expand_checkboxes($element) {
+  if (isset($element['#select_or_other_checkboxes']) && $element['#select_or_other_checkboxes']) {
+    foreach (element_children($element) as $key) {
+      $element[$key]['#return_value'] = check_plain($element[$key]['#return_value']);
+      $element[$key]['#name'] = $element['#name'] . '[' . $element[$key]['#return_value'] . ']';
+      $element[$key]['#value_callback'] = 'select_or_other_checkbox_value';
+      $element[$key]['#pre_render'][] = 'select_or_other_checkbox_prerender';
+    }
+  }
+  return $element;
+}
+
+/**
+ * Helper function to determine the value for a checkbox form element.
+ *
+ * Drupal core cannot discern the difference between an unchecked checkbox and
+ * a checked checkbox that has a value of '0'. This value callback will return
+ * NULL instead of an integer 0 for checkboxes that are not checked.
+ *
+ * @see form_type_checkbox_value()
+ */
+function select_or_other_checkbox_value($form, $edit = FALSE) {
+  if ($edit !== FALSE) {
+    if (empty($form['#disabled'])) {
+      return $edit !== NULL ? $form['#return_value'] : NULL; // 0 in core.
+    }
+    else {
+      return $form['#default_value'];
+    }
+  }
+}
+
+/**
+ * Helper function to ensure that the default value of "0" checkboxes renders.
+ *
+ * The default handling of checkboxes only checks checkboxes based on the #value
+ * property. If a checkbox has a value of "0" (as a string), the checkbox
+ * doesn't print out the way it should.
+ *
+ * @see theme_checkbox()
+ */
+function select_or_other_checkbox_prerender($element) {
+  if ($element['#value'] === '0') {
+    $element['#value'] = TRUE;
+  }
+  return $element;
+}
+
+/**
+ * Element validate callback for a Select (or other) element.
+ */
+function select_or_other_element_validate($element, &$form_state) {
+  $other_selected = FALSE;
+  if (is_array($element['select']['#value']) && in_array('select_or_other', $element['select']['#value'])) {
+    // This is a multiselect. assoc arrays
+    $other_selected = TRUE;
+    $value = $element['select']['#value'];
+    unset($value['select_or_other']);
+    $value[$element['other']['#value']] = $element['other']['#value'];
+  }
+  else if (is_string($element['select']['#value']) && $element['select']['#value'] == 'select_or_other') {
+    // This is a single select.
+    $other_selected = TRUE;
+    $value = $element['other']['#value'];
+  }
+  else {
+    $value = $element['select']['#value'];
+  }
+  if ($other_selected && !$element['other']['#value']) {
+    form_error($element['other'], t('!title is required', array('!title' => $element['#title'])));
+  }
+  if (isset($value)) {
+    form_set_value($element, $value, $form_state);
+    $form_state['clicked_button']['#post'][$element['#name']] = $value;  // Is this something we should do?
+  }
+  return $element;
+}
+
+/**
+ * Test function.
+ * to view, visit http://example.com/?q=select-or-other-test-form
+ * You must have the permission 'access administration pages'.
+ */
+function select_or_other_test_form($form_state) {
+  $v = &$form_state['values'];
+  $form['my_field_1'] = array(
+    '#type' => 'select_or_other',
+    '#title' => t('My example Field'),
+    '#default_value' => $v['my_field_1'] ? $v['my_field_1'] : array('Another value', 'extra value'),
+    '#options' => array(
+      'option1' => t('Option 1'),
+      'option2' => t('Option 2'),
+      'option3' => t('Option 3'),
+    ),
+    '#other' => t('Other (please type with your fingers)'),
+    '#required' => TRUE,
+    '#multiple' => FALSE,
+    '#other_delimiter' => ', ', // if this is FALSE only the last value will be used
+    '#other_unknown_defaults' => 'other', // possible values 'append', 'ignore', 'other'  (if other specified you can also override #other_delimiter).
+    '#description' => t("The description of this element."),
+  );
+  $form['fieldset'] = array(
+    '#type' => 'fieldset',
+    '#title' => t('Fieldset'),
+    '#collapsible' => TRUE,
+    '#collapsed' => TRUE,
+
+  );
+  $form['fieldset']['my_field_2'] = array(
+    '#type' => 'select_or_other',
+    '#select_type' => 'checkboxes',
+    '#title' => t('My checkboxes example'),
+    '#default_value' => $v['my_field_2'] ? $v['my_field_2'] : array('Another value'),
+    '#options' => array(
+      'option1' => t('Option 1'),
+      'option2' => t('Option 2'),
+      'option3' => t('Option 3'),
+    ),
+    '#other' => t('Other (please type with your fingers)'),
+    '#required' => TRUE,
+    '#multiple' => TRUE, // this should be ignored for checkboxes
+    '#other_delimiter' => ', ', // if this is FALSE only the last value will be used
+    '#other_unknown_defaults' => 'append', // possible values 'append', 'ignore', 'other'  (if other specified you can also override #other_delimiter).
+  );
+  $form['submit'] = array('#type' => 'submit', '#value' => t('Save'));
+  return $form;
+}
+
+function select_or_other_test_form_submit($form, &$form_state) {
+  // drupal_set_message("form_state<pre>".print_r($form_state,true));
+  $form_state['storage'] = $form_state['values'];
+}
+
+/**
+ * Implementation of hook_menu().
+ */
+function select_or_other_menu() {
+  $items = array();
+  $items['select-or-other-test-form'] = array(
+    'title' => 'select_or_other test',
+    'page callback' => 'drupal_get_form',
+    'page arguments' => array('select_or_other_test_form'),
+    'access arguments' => array('access administration pages'),
+    'type' => MENU_CALLBACK,
+  );
+  return $items;
+}
+
+/**
+ * Implementation of hook_widget_info().
+ *
+ * This is a CCK hook.
+ */
+function select_or_other_widget_info() {
+  return array(
+    'select_or_other' => array(
+      'label' => t('Select (or other) list'),
+      'field types' => array('text', 'number_integer', 'number_decimal', 'number_float'),
+      'multiple values' => CONTENT_HANDLE_MODULE,
+      'callbacks' => array(
+        'default value' => CONTENT_CALLBACK_DEFAULT,
+      ),
+    ),
+    'select_or_other_sort' => array(
+      'label' => t('Select (or other) drag and drop lists'),
+      'field types' => array('text', 'number_integer', 'number_decimal', 'number_float'),
+      'multiple values' => CONTENT_HANDLE_CORE,
+      'callbacks' => array(
+        'default value' => CONTENT_CALLBACK_DEFAULT,
+      ),
+    ),
+    'select_or_other_buttons' => array(
+      'label' => t('Select (or other) check boxes/radio buttons'),
+      'field types' => array('text', 'number_integer', 'number_decimal', 'number_float'),
+      'multiple values' => CONTENT_HANDLE_MODULE,
+      'callbacks' => array(
+        'default value' => CONTENT_CALLBACK_DEFAULT,
+      ),
+    ),
+  );
+}
+
+/**
+ * Implementation of hook_widget().
+ *
+ * This is a CCK hook.
+ */
+function select_or_other_widget(&$form, &$form_state, $field, $items, $delta = NULL) {
+
+  $options = array();
+
+  // Create options - similar to code from content_allowed_values().
+  $list = explode("\n", $field['widget']['available_options']);
+
+  if (!empty($field['widget']['available_options_php'])) {
+    ob_start();
+    $list = eval($field['widget']['available_options_php']);
+    ob_end_clean();
+  }
+
+  $list = array_map('trim', $list);
+  $list = array_filter($list, 'strlen');
+  foreach ($list as $opt) {
+    // Sanitize the user input with a permissive filter.
+    $opt = content_filter_xss($opt);
+    if (strpos($opt, '|') !== FALSE) {
+      list($key, $value) = explode('|', $opt);
+      $options[$key] = (isset($value) && $value !=='') ? html_entity_decode($value) : $key;
+    }
+    else {
+      $options[$opt] = $opt;
+    }
+  }
+
+  // Add a 'none' option for non-required single selects, sort selects, and radios
+  if (!$field['required']) {
+    if (($field['widget']['type'] == 'select_or_other_buttons' && !$field['multiple'])
+      || ($field['widget']['type'] == 'select_or_other' && !$field['multiple'])
+      || ($field['widget']['type'] == 'select_or_other_sort')) {
+      $options = array('' => theme('select_or_other_none', $field)) + $options;
+    }
+  }
+
+  // Construct the element.
+  $element = array(
+    '#type' => 'select_or_other',
+    '#other' => $field['widget']['other'],
+    '#default_value' => isset($items[$delta]) ? $items[$delta] : NULL,
+    '#options' => $options,
+    '#description' => $field['widget']['description'],
+    '#multiple' => $field['multiple'],
+    '#required' => $field['required'],
+    //'#other_delimiter' => $field['widget']['other_delimiter'] == 'FALSE' ? FALSE : $field['widget']['other_delimiter'],
+    '#other_delimiter' => FALSE,
+    '#other_unknown_defaults' => $field['widget']['other_unknown_defaults'],
+    '#element_validate' => array('select_or_other_cck_validate'),
+    '#cck_widget' => $field['widget']['type'],
+  );
+
+  // Set select type's.
+  switch($field['widget']['type']) {
+    case 'select_or_other':
+      $element['#select_type'] = 'select';
+      break;
+
+    case 'select_or_other_sort':
+      $element['#select_type'] = 'select';
+      // Also disable multiples for this select type.
+      $element['#multiple'] = FALSE;
+      break;
+
+    case 'select_or_other_buttons':
+      $element['#select_type'] = $field['multiple'] ? 'checkboxes' : 'radios';
+      break;
+  }
+
+  // In situations where we handle our own multiples (checkboxes and multiple selects) set defaults differently.
+  if ($element['#multiple']) {
+    $element['#default_value'] = array();
+    foreach ($items as $delta => $item) {
+      $element['#default_value'][$delta] = $item['value'];
+    }
+  }
+
+  return $element;
+}
+
+/**
+ * Implementation of hook_widget_settings().
+ *
+ * This is a CCK hook.
+ */
+function select_or_other_widget_settings($op, $widget) {
+  switch ($op) {
+    case 'form':
+      $form = array();
+
+      $form['available_options'] = array(
+        '#type' => 'textarea',
+        '#title' => t('Available options'),
+        '#description' => t('A list of values that are, by default, available for selection. Enter one value per line, in the format key|label. The key is the value that will be stored in the database, and the label is what will be displayed to the user.  This is not the same as <em>allowed values</em> (below) which will also restrict what a user can type into the <em>other</em> textfield.'),
+        '#default_value' => isset($widget['available_options']) ? $widget['available_options'] : '',
+      );
+      $form['available_options_fieldset']['advanced_options'] = array(
+        '#type' => 'fieldset',
+        '#title' => t('PHP code'),
+        '#collapsible' => TRUE,
+        '#collapsed' => empty($widget['available_options_php']),
+      );
+      if (user_access('Use PHP input for field settings (dangerous - grant with care)')) {
+        $form['available_options_fieldset']['advanced_options']['available_options_php'] = array(
+          '#type' => 'textarea',
+          '#title' => t('Code'),
+          '#default_value' => !empty($widget['available_options_php']) ? $widget['available_options_php'] : '',
+          '#rows' => 6,
+          '#description' => t('Advanced usage only: PHP code that returns a keyed array of available options. Should not include &lt;?php ?&gt; delimiters. If this field is filled out, the array returned by this code will override the available options list above.'),
+        );
+      }
+      else {
+        $form['available_options_fieldset']['advanced_options']['markup_available_options_php'] = array(
+          '#type' => 'item',
+          '#title' => t('Code'),
+          '#value' => !empty($widget['available_options_php']) ? '<code>'. check_plain($widget['available_options_php']) .'</code>' : t('&lt;none&gt;'),
+          '#description' => empty($widget['available_options_php']) ? t("You're not allowed to input PHP code.") : t('This PHP code was set by an administrator and will override the allowed values list above.'),
+        );
+      }
+      $form['other'] = array(
+        '#type' => 'textfield',
+        '#title' => t('<em>Other</em> option'),
+        '#description' => t('Label for the option that the user will choose when they want to supply an <em>other</em> value.'),
+        '#default_value' => isset($widget['other']) ? $widget['other'] : t('Other'),
+        '#required' => TRUE,
+      );
+      $form['other_unknown_defaults'] = array(
+        '#type' => 'select',
+        '#title' => t('<em>Other</em> value as default value'),
+        '#description' => t("If any incoming default values do not appear in <em>available options</em> (i.e. set as <em>other</em> values), what should happen?"),
+        '#options' => array(
+          'other' => t('Add the values to the other textfield'),
+          'append' => t('Append the values to the current list'),
+          'available' => t('Append the values to the available options'),
+          'ignore' => t('Ignore the values'),
+        ),
+        '#default_value' => isset($widget['other_unknown_defaults']) ? $widget['other_unknown_defaults'] : 'other',
+        '#required' => TRUE,
+      );
+      /*
+      There are design issues with saving multiple other values with some CCK widgets - this needs a rethink.
+
+      $form['other_delimiter'] = array(
+        '#type' => 'textfield',
+        '#title' => t('Other delimiter'),
+        '#description' => t("Delimiter string to delimit multiple 'other' values into the <em>other</em> textfield.  If you enter <em>FALSE</em> only the last value will be used."),
+        '#default_value' => isset($widget['other_delimiter']) ? $widget['other_delimiter'] : ', ',
+        '#required' => TRUE,
+        '#size' => 5,
+      );
+      */
+      return $form;
+
+    case 'validate':
+      if (empty($widget['available_options']) && empty($widget['available_options_php'])) {
+        form_set_error('available_options', t('You must provide <em>Available options</em>.'));
+      }
+      break;
+
+    case 'save':
+      return array('available_options', 'available_options_php', 'other', 'other_unknown_defaults', /*'other_delimiter'*/);
+  }
+}
+
+/**
+ * Element validate callback for a Select (or other) CCK widget.
+ */
+function select_or_other_cck_validate($element, &$form_state) {
+  $other_selected = FALSE;
+
+  if (is_array($element['select']['#value']) && in_array('select_or_other', $element['select']['#value'])) {
+    // This is a multiselect. assoc arrays
+    $other_selected = TRUE;
+    $value = $element['select']['#value'];
+    unset($value['select_or_other']);
+    $value[$element['other']['#value']] = $element['other']['#value'];
+  }
+  else if (is_string($element['select']['#value']) && $element['select']['#value'] == 'select_or_other') {
+    // This is a single select.
+    $other_selected = TRUE;
+    $value = $element['other']['#value'];
+  }
+  else {
+    $value = $element['select']['#value'];
+  }
+  if ($other_selected && !$element['other']['#value'] && $form_state['values']['form_id'] != 'content_field_edit_form') {
+    form_error($element['other'], t('%name: @title is required', array('%name' => t($element['select']['#title']), '@title' => $element['#other'])));
+  }
+  if (isset($value)) {
+    if (in_array($element['#cck_widget'], array('select_or_other', 'select_or_other_buttons'))) {
+      // Filter out 'none' value (if present, will always be in key 0)
+      if (isset($items[0]['value']) && $items[0]['value'] === '') {
+        unset($items[0]);
+      }
+      if ($element['#multiple'] >= 2 && count($value) > $element['#multiple']) {
+        form_error($element['select'], t('%name: this field cannot hold more than @count values.', array('%name' => t($element['select']['#title']), '@count' => $element['#multiple'])));
+      }
+      $delta = 0;
+      $values = array();
+      foreach ((array)$value as $v) {
+        $values[$delta++]['value'] = $v;
+      }
+      $value = $values;
+    }
+    else if ($element['#cck_widget'] == 'select_or_other_sort') {
+      $value = array('value' => $value);
+    }
+    form_set_value($element, $value, $form_state);
+    $form_state['clicked_button']['#post'][$element['#name']] = $value;  // Is this something we should do?
+  }
+
+  // Add values to available options is configured to do so.
+  $field_name = &$element['#parents'][0];
+  $type = &$form_state['values']['type'];
+  module_load_include('inc', 'content', 'includes/content.crud');
+  $instance = reset(content_field_instance_read(array('type_name' => $type, 'field_name' => $field_name)));
+  if ($instance['widget']['other_unknown_defaults'] == 'available') {
+    if (
+      $element['select']['#value'] == 'select_or_other' &&
+      !empty($element['other']['#value']) &&
+      !isset($element['#options'][$element['other']['#value']])
+    ) {
+      // Make the change.
+      $instance['widget']['available_options'] .= "\n" . $element['other']['#value'];
+      // Save the instance.
+      content_field_instance_update($instance);
+    }
+  }
+
+  return $element;
+}
+
+
+/**
+ *  Theme the label for the empty value for options that are not required.
+ *  The default theme will display N/A for a radio list and blank for a select.
+ */
+function theme_select_or_other_none($field) {
+  switch ($field['widget']['type']) {
+    case 'select_or_other_buttons':
+      return t('N/A');
+    case 'select_or_other':
+    case 'select_or_other_sort':
+      return t('- None -');
+    default :
+      return '';
+  }
+}
+
+/**
+ * Implementation of hook_content_allowed_values_alter().
+ *
+ * Integrate with CCK for properly displaying key|value options.
+ */
+function select_or_other_content_allowed_values_alter(&$allowed_values, $field) {
+  // Test the operation to avoid validation error with text field validation on saving.
+  if (
+     $field['widget']['module'] == 'select_or_other' &&
+     $_POST['op'] != t('Save') &&
+     $_POST['op'] != t('Delete')
+  ) {
+
+    $list = explode("\n", $field['widget']['available_options']);
+    $list = array_map('trim', $list);
+    $list = array_filter($list, 'strlen');
+    foreach ($list as $option) {
+      // Sanitize the user input with a permissive filter.
+      $option = content_filter_xss($option);
+      if (strpos($option, '|') !== FALSE) {
+        list($key, $value) = explode('|', $option);
+        $allowed_values[$key] = (isset($value) && $value !== '') ? html_entity_decode($value) : $key;
+      }
+      else {
+        $allowed_values[$option] = $option;
+      }
+    }
+
+    // Add the other value to the allowed values.
+    if (!empty($_POST[$field['field_name']]['other'])) {
+      // Sanitize the user input with a permissive filter.
+      $value = check_plain(content_filter_xss(trim($_POST[$field['field_name']]['other'])));
+      if ($value !== '') {
+        $allowed_values[$value] = $value;
+      }
+    }
+
+  }
+}
+
+/**
+ * Implementation of hook_apachesolr_cck_fields_alter().
+ *
+ * Integrate with apachesolr.module.
+ */
+function select_or_other_apachesolr_cck_fields_alter(&$mappings) {
+  $map = array(
+    'display_callback' => 'apachesolr_cck_text_field_callback',
+    'indexing_callback' => 'apachesolr_cck_text_indexing_callback',
+    'index_type' => 'string',
+    'facets' => TRUE,
+  );
+  $mappings['text']['select_or_other_buttons'] = &$map;
+  $mappings['text']['select_or_other'] = &$map;
+  $mappings['text']['select_or_other_sort'] = &$map;
+}
+
+/**
+ * Helper function to check keys in multidimensional array.
+ *
+ * @param $needle
+ *   The key.
+ * @param $haystack
+ *   The array to check.
+ * @return
+ *   Boolean indicating if the key is set.
+ */
+function select_or_other_multi_array_key_exists($needle, $haystack) {
+  foreach ($haystack as $key => $value) {
+    if ($needle === $key) {
+      return TRUE;
+    }
+    if (is_array($value)) {
+      if (select_or_other_multi_array_key_exists($needle, $value)) {
+        return TRUE;
+      }
+    }
+  }
+  return FALSE;
+}
+
+/**
+ * Implementation of hook_content_multigroup_allowed_widgets().
+ */
+function select_or_other_content_multigroup_allowed_widgets() {
+  return array('select_or_other', 'select_or_other_sort', 'select_or_other_buttons');
+}
+
+/**
+ * Implementation of hook_content_multigroup_no_remove_widgets().
+ */
+function select_or_other_content_multigroup_no_remove_widgets() {
+  return array('select_or_other', 'select_or_other_sort', 'select_or_other_buttons');
+}

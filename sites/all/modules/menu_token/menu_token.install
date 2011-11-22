@@ -1,0 +1,92 @@
+<?php
+/**
+ * @file
+ *   Install file for menu_token module.
+ */
+
+/**
+ * Implementation of hook_schema().
+ */
+function menu_token_schema() {
+  $schema['menu_token'] = array(
+    'description' => t('Menu token properties'),
+    'fields' => array (
+      'mlid' => array (
+        'description' => t('The menu link {menu_links}.mlid'),
+        'type' => 'int',
+        'unsigned' => TRUE,
+        'not null' => TRUE,
+      ),
+      'link_path' => array (
+        'description' => t('The actual path with tokens'),
+        'type' => 'varchar',
+        'length' => 255,
+        'not null' => TRUE,
+        'default' => '',
+      ),
+    ),
+    'primary key' => array('mlid'),
+  );
+
+  return $schema;
+}
+
+/**
+ * Implementation of hook_install()
+ */
+function menu_token_install() {
+  drupal_install_schema('menu_token');
+}
+
+/**
+ * Implementation of hook_uninstall().
+ */
+function menu_token_uninstall() {
+  drupal_uninstall_schema('menu_token');
+}
+
+/**
+ * Implementation of hook_update_N().
+ */
+function menu_token_update_6000() {
+  $ret = array();
+  $schema['menu_token'] = array(
+    'description' => t('Menu token properties'),
+    'fields' => array (
+      'mlid' => array (
+        'description' => t('The menu link {menu_links}.mlid'),
+        'type' => 'int',
+        'unsigned' => TRUE,
+        'not null' => TRUE,
+      ),
+      'link_path' => array (
+        'description' => t('The actual path with tokens'),
+        'type' => 'varchar',
+        'length' => 255,
+        'not null' => TRUE,
+        'default' => '',
+      ),
+    ),
+    'primary key' => array('mlid'),
+  );
+
+  // Create schema.
+  db_create_table($ret, 'menu_token', $schema['menu_token']);
+  
+  // Insert records.
+  foreach (variable_get('menu_token_enabled', array()) as $mlid => $link_path) {
+    $link_path = db_escape_string($link_path);
+    $ret[] = update_sql("INSERT INTO {menu_token} (mlid, link_path) VALUES ($mlid, '$link_path')");
+  }
+
+  // Delete variable in case of all queries were successful.
+  $success = true;
+  foreach ($ret as $r) {
+    $success = $success && $r['success'];
+  }
+  if ($success) {
+    variable_del('menu_token_enabled');
+  }
+
+  return $ret;
+}

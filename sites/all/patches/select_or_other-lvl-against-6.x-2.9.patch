@@ -1,0 +1,39 @@
+diff --git a/select_or_other.info b/select_or_other.info
+index cf5d8d2..9cd6059 100644
+--- a/select_or_other.info
++++ b/select_or_other.info
+@@ -1,9 +1,9 @@
+ name = Select (or other)
+ description = "Provides a select box form element with additional option 'Other' to give a textfield."
+ core = 6.x
+-; Information added by drupal.org packaging script on 2011-10-24
+-version = "6.x-2.9"
++; Information added by drupal.org packaging script on 2011-09-29
++version = "6.x-2.x-dev"
+ core = "6.x"
+ project = "select_or_other"
+-datestamp = "1319448335"
++datestamp = "1317298754"
+ 
+diff --git a/select_or_other.module b/select_or_other.module
+index 63d88a3..908aba6 100644
+--- a/select_or_other.module
++++ b/select_or_other.module
+@@ -426,7 +426,7 @@ function select_or_other_widget(&$form, &$form_state, $field, $items, $delta = N
+       $options[$key] = (isset($value) && $value !=='') ? html_entity_decode($value) : $key;
+     }
+     else {
+-      $options[$opt] = html_entity_decode($opt);
++      $options[$opt] = $opt;
+     }
+   }
+ 
+@@ -676,7 +676,7 @@ function select_or_other_content_allowed_values_alter(&$allowed_values, $field)
+         $allowed_values[$key] = (isset($value) && $value !== '') ? html_entity_decode($value) : $key;
+       }
+       else {
+-        $allowed_values[$option] = html_entity_decode($option);
++        $allowed_values[$option] = $option;
+       }
+     }
+ 

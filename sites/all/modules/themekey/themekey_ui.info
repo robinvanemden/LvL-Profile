@@ -1,0 +1,13 @@
+
+name = "ThemeKey UI"
+description = "Integrates ThemeKey with Drupal administration forms."
+core = 6.x
+dependencies[]= themekey
+package = ThemeKey
+
+; Information added by drupal.org packaging script on 2011-09-19
+version = "6.x-3.6"
+core = "6.x"
+project = "themekey"
+datestamp = "1316422906"
+

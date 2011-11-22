@@ -1,0 +1,10 @@
+name = View Unpublished Content
+description = "Select which roles should be able to see unpublished nodes by content type, or all unpubished nodes."
+package = "Permissions"
+core = 6.x
+; Information added by drupal.org packaging script on 2011-04-20
+version = "6.x-1.2"
+core = "6.x"
+project = "view_unpublished"
+datestamp = "1303343517"
+

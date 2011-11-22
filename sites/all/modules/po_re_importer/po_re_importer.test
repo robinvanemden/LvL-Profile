@@ -1,0 +1,140 @@
+<?php
+
+/**
+ * @file
+ * Creates tests for po_re_importer module.
+ */
+
+class PoReImporterAccessTestCase extends DrupalWebTestCase {
+
+  protected $path = 'admin/build/translate/poreimporter';
+
+  public static function getInfo() {
+    return array(
+      'name' => 'Po-Re-Importer access',
+      'description' => 'Po-Re-Importer access functionality.',
+      'group' => 'Po-Re-Importer'
+    );
+  }
+
+  function setUp() {
+    parent::setUp('po_re_importer', 'locale');
+  }
+
+  function testAccess() {
+    $this->DrupalGet($this->path);
+    $this->assertResponse(403);
+
+    $this->DrupalGet($this->path . '/settings');
+    $this->assertResponse(403);
+
+    $user1 = $this->drupalCreateUser();
+    $this->drupalLogin($user1);
+    $this->DrupalGet($this->path);
+    $this->assertResponse(403);
+    $this->DrupalGet($this->path . '/settings');
+    $this->assertResponse(403);
+    $this->drupalLogout();
+
+    $user1 = $this->drupalCreateUser(array('administer languages'));
+    $this->drupalLogin($user1);
+    $this->DrupalGet($this->path);
+    $this->assertResponse(200);
+    $this->DrupalGet($this->path . '/settings');
+    $this->assertResponse(200);
+    $this->drupalLogout();
+  }
+
+}
+
+class PoReImporterUITestCase extends DrupalWebTestCase {
+
+  protected $path = 'admin/build/translate/poreimporter';
+
+  public static function getInfo() {
+    return array(
+      'name' => 'Po-Re-Importer UI',
+      'description' => 'Po-Re-Importer UI functionality.',
+      'group' => 'Po-Re-Importer'
+    );
+  }
+
+  function setUp() {
+    parent::setUp('po_re_importer', 'locale');
+  }
+
+  function testUI() {
+    $user1 = $this->drupalCreateUser(array('administer languages'));
+    $this->drupalLogin($user1);
+    $this->DrupalGet($this->path);
+    $this->assertText(_po_re_importer_no_non_english_langauge_found(TRUE));
+    $this->drupalLogout();
+
+    // User to add and remove language.
+    $admin_user = $this->drupalCreateUser(array('administer languages', 'access administration pages'));
+    $this->drupalLogin($admin_user);
+
+    $this->DrupalGet($this->path);
+    $this->assertLink('languages page');
+    $this->clickLink('languages page', 0);
+    $this->assertResponse(200);
+
+    // Add predefined language.
+    $edit = array(
+      'langcode' => 'de',
+    );
+    $this->drupalPost('admin/settings/language/add', $edit, t('Add language'));
+    $result = db_result(db_query('SELECT COUNT(*) FROM {po_re_importer}'));
+    $this->assertTrue($result);
+
+    $this->DrupalGet($this->path);
+    $this->assertText('There are no new translation files in the index to import.');
+
+    $edit = array(
+      'import_mode' => 1,
+      'components'     => 'nothing',
+      'textgroup'   => 'default',
+    );
+    $this->drupalPost($this->path, $edit, t('Import'));
+    $this->assertText('Import into field is required.');
+
+    $edit = array(
+      'import_mode' => 1,
+      'language'    => 'de',
+      'components'     => 'nothing',
+      'textgroup'   => 'default',
+    );
+    $this->drupalPost($this->path, $edit, t('Import'));
+    $this->assertLink('Rebuild the Po-Re-Importer Index.');
+    $this->clickLink('Rebuild the Po-Re-Importer Index.', 0);
+    $this->assertText('Po Re-Importer Index rebuilded.');
+    $this->assertEqual($this->getUrl(), url($this->path, array('absolute' => TRUE)), t('Correct page redirection.'));
+    $this->assertNoLink('Cron');
+    $this->drupalLogout();
+
+    $admin_user = $this->drupalCreateUser(array('administer languages', 'access administration pages', 'administer site configuration'));
+    $this->drupalLogin($admin_user);
+
+    $this->DrupalGet($this->path);
+    $this->assertLink('Cron');
+    $this->clickLink('Cron', 0);
+    $this->assertResponse(200);
+    $this->assertText('Cron ran successfully.');
+    $this->assertEqual($this->getUrl(), url($this->path, array('absolute' => TRUE)), t('Correct page redirection.'));
+
+    $edit = array(
+      'po_re_importer_show_index' => 1,
+    );
+    $this->drupalPost($this->path. '/settings', $edit, t('Save configuration'));
+    $this->assertText('The configuration options have been saved.');
+    $this->assertFieldChecked('edit-po-re-importer-show-index', t('Show index enabled.'));
+    $this->assertText('German - Already imported');
+
+    $this->DrupalGet('admin/settings/language');
+    $this->drupalPost('admin/settings/language/delete/de', array(), t('Delete'));
+    $result = db_result(db_query('SELECT COUNT(*) FROM {po_re_importer}'));
+    $this->assertFalse($result);
+
+    $this->drupalLogout();
+  }
+}

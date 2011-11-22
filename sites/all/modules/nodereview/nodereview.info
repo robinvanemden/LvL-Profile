@@ -1,0 +1,12 @@
+name = Node Review
+description = "Add reviews to arbitrary node types."
+dependencies[] = votingapi
+dependencies[] = views
+core = 6.x
+
+; Information added by drupal.org packaging script on 2011-04-16
+version = "6.x-1.x-dev"
+core = "6.x"
+project = "nodereview"
+datestamp = "1302914321"
+

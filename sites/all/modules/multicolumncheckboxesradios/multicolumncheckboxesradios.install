@@ -1,0 +1,16 @@
+<?php
+// $Id: multicolumncheckboxesradios.install,v 1.1 2009/07/02 20:19:03 mattyoung Exp $
+/**
+ * @file multicolumncheckboxesradios.install
+ * module install/uninstall
+ */
+
+
+function multicolumncheckboxesradios_install() {
+  // Give self a very heavy weight so our #process function is the last to execute
+  db_query("UPDATE {system} SET weight = 255 WHERE name = 'multicolumncheckboxesradios'");
+}
+
+function multicolumncheckboxesradios_uninstall() {
+  // nothing, here just to make module uninstall possible
+}

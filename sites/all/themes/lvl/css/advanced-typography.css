@@ -1,0 +1,198 @@
+
+
+
+
+/*--------------------------------------------------------------*/
+/* Headings
+/-------------------------------------------------------------- */
+h1 {
+  font-size:240%;
+  font-weight:bold;
+  line-height:1.15em;
+}
+h2 {
+  font-size:220%;
+  line-height:1em;
+}
+h3 {
+  font-size:190%;
+  line-height:1.25em;
+}
+h4 {
+  font-size:155%;
+  line-height:1em;
+}
+h5 {
+  font-size:130%;
+  line-height:1em;
+}
+h6 {
+  font-size:97%;
+  line-height:1em;
+}
+/*--------------------------------------------------------------*/
+/* Special Tags
+/-------------------------------------------------------------- */
+blockquote {
+  background:url(../images/typo/blockquote.gif) left 0 no-repeat;
+  color:#454545;
+  font-family:Georgia, "Times New Roman", Times, serif;
+  font-size:1.33em;
+  font-style:italic;
+  padding-left:38px;
+  margin:8px;
+}
+blockquote p {
+  background:url(../images/typo/blockquote-inner.gif) right bottom no-repeat;
+  padding-right:33px;
+  padding-bottom:5px;
+  padding-top:5px;
+  margin:0px;
+}
+pre, code {
+  background:#e5e5e5;
+	border-left:12px solid #a0a0a0;
+	padding:10px;
+	font-size:.92em;
+	font-family: Verdana, Arial, Helvetica, sans-serif;
+	margin:20px 0;
+}
+code {
+  border:2px solid #b6b6b6;
+	background:#f0f0f0;
+	padding:10px;
+	display:block;
+}
+/*--------------------------------------------------------------*/
+/* Listings
+/-------------------------------------------------------------- */
+ul.check-list, ul.arrow-list, ul.arrow-list {
+  margin-left:0px !important;
+}
+ul.check-list li, ul.arrow-list li, ul.arrow-list li {
+	padding-top:4px;
+	padding-bottom:4px;
+	padding-left:21px;
+	list-style:none;
+	list-style-image:none;
+	background-position:0 5px;
+	background-repeat:no-repeat;
+}
+ul.arrow-list li {
+  background-image: url(../images/typo/arrow.png);
+}
+ul.check-list li{
+  background-image: url(../images/typo/check.png);
+}
+/*--------------------------------------------------------------*/
+/* Special Message Styles
+/-------------------------------------------------------------- */
+.status-box, .warning-box, .error-box, .info-box {
+  margin:18px 0;
+	border-width:1px;
+	border-style: solid;
+	padding:13px 15px;
+}
+.status-box {
+	background:#eef9e6;
+	border-color:#72d727;
+}
+.warning-box {
+	background:#fdf4e2;
+	border-color:#fba903;
+}
+.error-box {
+	background:#fee2e2;
+	border-color:#ff0000;
+}
+.info-box {
+	background:#e2f4fe;
+	border-color:#00a0ff;
+
+/*--------------------------------------------------------------*/
+/* More Paragraph Styles
+/-------------------------------------------------------------- */
+.download, .upload, .note, .tip, .word, .excel, .pdf, .compressed, .user, .comment, .check, .arrow, .alert, .info, .email, .mobile, .tag, .cart, .home, .key, .lock, .image, .video  {
+  background:url(../images/typo/download.png) 0 6px no-repeat;
+	display:block;
+  padding:4px 0 4px 21px;
+	min-height:19px;
+}
+.upload {
+  background-image:url(../images/typo/upload.png);
+}
+.note {
+  background-image:url(../images/typo/note.png);
+}
+.tip {
+  background-image:url(../images/typo/tip.png);
+}
+.word {
+  background-image:url(../images/typo/word.png);
+}
+.excel {
+  background-image:url(../images/typo/excel.png);
+}
+.pdf {
+  background-image:url(../images/typo/pdf.png);
+}
+.compressed {
+  background-image:url(../images/typo/compressed.png);
+}
+.user {
+  background-image:url(../images/typo/user.png);
+}
+.comment {
+  background-image:url(../images/typo/comment.png);
+}
+.check {
+  background-image:url(../images/typo/check.png);
+}
+.arrow {
+  background-image:url(../images/typo/arrow.png);
+}
+.alert {
+  background-image:url(../images/typo/alert.png);
+}
+.info {
+  background-image:url(../images/typo/info.png);
+}
+.email {
+  background-image:url(../images/typo/email.png);
+}
+.mobile {
+  background-image:url(../images/typo/mobile.png);
+}
+.tag {
+  background-image:url(../images/typo/tag.png);
+}
+.cart {
+  background-image:url(../images/typo/cart.png);
+}
+.home {
+  background-image:url(../images/typo/home.png);
+}
+.key {
+  background-image:url(../images/typo/key.png);
+}
+.lock {
+  background-image:url(../images/typo/lock.png);
+}
+.image {
+  background-image:url(../images/typo/image.png);
+}
+.video {
+  background-image:url(../images/typo/video.png);
+}
+
+/* Helper Class
+/-------------------------------------------------------------- */
+div.typo-title {
+  font-size:1.8em;
+	font-style:italic;
+	font-family:Georgia, "Times New Roman", Times, serif;
+	color:#454545;
+	padding:5px 10px 10px 0;
+	border-bottom :1px dashed #454545;
+	margin-bottom:16px;
+}

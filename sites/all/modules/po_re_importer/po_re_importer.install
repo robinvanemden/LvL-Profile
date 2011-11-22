@@ -1,0 +1,159 @@
+<?php
+/**
+ * @file
+ * po_re_importer.install
+ */
+
+/**
+ * Implementation of hook_requirements().
+ */
+function po_re_importer_requirements($phase) {
+  if ($phase == 'runtime') {
+    if (po_re_importer_language_list()) {
+      $requirements['po_re_importer']['title'] = t('Translation update status');
+      if (_po_re_importer_file_count(PO_RE_IMPORTER_NOT_IMPORTED) != 0) {
+        $requirements['po_re_importer']['severity'] = REQUIREMENT_WARNING;
+        $requirements['po_re_importer']['value'] = t('There are available updates');
+        $text = _po_re_importer_file_count_msg(_po_re_importer_file_count(PO_RE_IMPORTER_NOT_IMPORTED));
+        $description = l($text, 'admin/build/translate/poreimporter', array('html' => TRUE));
+        $requirements['po_re_importer']['description'] =  $description;
+      }
+      else {
+        $requirements['po_re_importer']['severity'] = REQUIREMENT_OK;
+        $requirements['po_re_importer']['value'] = t('All your translations are up to date');
+      }
+    }
+    else {
+      $requirements['po_re_importer']['title'] = t('Translation update status');
+      $requirements['po_re_importer']['value'] = t('No update data available');
+      $requirements['po_re_importer']['severity'] = REQUIREMENT_WARNING;
+      //No non-English , so t() makes no sense
+      $requirements['po_re_importer']['description'] = 'No non-English languages found. To import translation packets, please enable at least one language.';
+    }
+    return $requirements;
+  }
+  // We must always return array, the installer doesn't use module_invoke_all()
+  return array();
+}
+
+/**
+ * Implementation of hook_install().
+ */
+
+function po_re_importer_install() {
+  drupal_install_schema('po_re_importer');
+  variable_set('po_re_importer_cron', 604800);
+  variable_set('po_re_importer_first_run', 1);
+  drupal_set_message(t('Po-Re-Importer was successfully installed. You can find the settings page !here.', array('!here' => l('here', 'admin/build/translate/poreimporter'))));
+}
+
+/**
+ * Implementation of hook_schema().
+ */
+function po_re_importer_schema() {
+$schema['po_re_importer'] = array(
+  'fields' => array(
+    'filepath' => array(
+      'type' => 'varchar',
+      'length' => '255',
+      'not null' => TRUE,
+    ),
+    'name' => array(
+      'type' => 'varchar',
+      'length' => '100',
+      'not null' => TRUE,
+    ),
+    'name_ui' => array(
+      'type' => 'varchar',
+      'length' => '100',
+      'not null' => TRUE,
+    ),
+    'langcode' => array(
+      'type' => 'varchar',
+      'length' => '10',
+      'not null' => TRUE,
+    ),
+    'importtime' => array(
+      'type' => 'int',
+      'not null' => TRUE,
+    ),
+    'imported' => array(
+      'type' => 'int',
+      'not null' => TRUE,
+      'default' => 0,
+    ),
+    'md5hash' => array(
+      'type' => 'varchar',
+      'length' => '56',
+      'not null' => TRUE,
+    ),
+  ),
+  'primary key' => array('filepath'),
+  'indexes' => array(
+    'imported' => array('imported'),
+    'langcode' => array('langcode'),
+    'name' => array('name'),
+  ),
+
+);
+
+  return $schema;
+}
+
+/**
+ * Implementation of hook_uninstall().
+ */
+
+function po_re_importer_uninstall() {
+  drupal_uninstall_schema('po_re_importer');
+  variable_del('po_re_importer_cron_last');
+  variable_del('po_re_importer_cron');
+  variable_del('po_re_importer_textgroups');
+  variable_del('po_re_importer_imported_files');
+  variable_del('po_re_importer_first_run');
+  variable_del('po_re_importer_show_index');
+}
+
+function po_re_importer_update_6101() {
+  $ret = array();
+  db_add_index($ret, 'po_re_importer', 'module', array('module'));
+  db_add_index($ret, 'po_re_importer', 'langcode', array('langcode'));
+  db_add_index($ret, 'po_re_importer', 'imported', array('imported'));
+  return $ret;
+}
+function po_re_importer_update_6102() {
+  $ret = array();
+  menu_cache_clear();
+  return $ret;
+}
+/**
+ *
+ * Add a new column name_ui and rename the column 'module' to name.
+ */
+function po_re_importer_update_6103() {
+  $ret = array();
+  $spec_name_ui = array(
+    'type' => 'varchar',
+    'length' => '100',
+    'not null' => TRUE,
+  );
+  if (!db_column_exists('po_re_importer', 'name_ui')) {
+    db_add_field($ret, 'po_re_importer', 'name_ui', $spec_name_ui);
+  }
+
+  $spec_name = array(
+    'type' => 'varchar',
+    'length' => '100',
+    'not null' => TRUE,
+  );
+  db_drop_index($ret, 'po_re_importer', 'module');
+  db_change_field($ret, 'po_re_importer', 'module', 'name', $spec_name);
+  db_add_index($ret, 'po_re_importer', 'name', array('name'));
+
+  $query = db_query("SELECT name FROM {po_re_importer}");
+  while ($result = db_fetch_object($query)) {
+    $name_ui = _po_re_importer_get_project_human_name($result->name);
+    db_query("UPDATE {po_re_importer} SET name_ui = '%s' WHERE name = '%s'", $name_ui, $result->name);
+  }
+  return $ret;
+}

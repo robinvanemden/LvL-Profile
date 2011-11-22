@@ -1,0 +1,12 @@
+
+name = "ThemeKey"
+description = "Map themes to Drupal paths or object properties."
+core = 6.x
+package = ThemeKey
+
+; Information added by drupal.org packaging script on 2011-09-19
+version = "6.x-3.6"
+core = "6.x"
+project = "themekey"
+datestamp = "1316422906"
+

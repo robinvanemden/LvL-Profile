@@ -1,0 +1,480 @@
+diff --git a/nodereview.admin.inc b/nodereview.admin.inc
+index 482bfa2..e7f66b8 100644
+--- a/nodereview.admin.inc
++++ b/nodereview.admin.inc
+@@ -21,13 +21,12 @@ function nodereview_configure_axes(&$form_state, $type, $name) {
+ 
+   $form['use'] = array(
+       '#type' => 'fieldset',
+-      '#title' => t('Reviews'),
++      '#title' => t('reviews'),
+       '#collapsible' => TRUE,
+       '#collapsed' => FALSE,
+   );
+ 
+   $form['use']['node_type'] = array('#type' => 'hidden', '#value' => $type);
+-  
+   $form['use']['guide'] = array(
+     '#type' => 'textarea',
+     '#title' => t('Usage Guide to the User'),
+@@ -35,18 +34,10 @@ function nodereview_configure_axes(&$form_state, $type, $name) {
+     '#default_value' => variable_get('nodereview_guide_'. $type, ''),
+     '#description' => t('Instructions to users for how to use this review.  These will be shown on the "Add Review" page. Note that if you have help text defined on admin/settings/content-types/nodereview, this value will override it.'),
+   );
+-  
+-  $form['use']['embed'] = array(
+-    '#type' => 'checkbox',
+-    '#title' => t('Embed the node reviews within the node content being reviewed.'),
+-    '#description' => t('Embed the node review form within the actual node content being reviewed instead of using a seperate menu tab'),
+-    '#default_value' => variable_get('nodereview_embed_'. $type, 0),
+-    '#return_value' => 1,
+-  );
+ 
+   $form['axes'] = array(
+     '#type' => 'fieldset',
+-    '#title' => t('Review Axes'),
++    '#title' => t('review axes'),
+     '#collapsible' => TRUE,
+     '#collapsed' => FALSE,
+     '#tree' => TRUE,
+@@ -87,9 +78,6 @@ function nodereview_configure_axes_submit($form, $form_state) {
+   // Save whether or not we're reviewing this node type
+   // variable_set('nodereview_use_' . $form_values['node_type'], $form_values['use']);
+   variable_set('nodereview_guide_'. $form_values['node_type'], $form_values['guide']);
+-  
+-  //save whether or not this axis should be embedded in the node content
+-  variable_set('nodereview_embed_' . $form_values['node_type'], $form_values['embed']);
+ 
+   // Regardless, save the user's data, just in case they may want it later
+   foreach ($form_values['axes'] as $axis) {
+@@ -161,9 +149,9 @@ function _nodereview_configure_axis($record) {
+   $form['weight'] = array(
+     '#type' => 'weight',
+     '#title' => t('weight'),
+-    '#delta' => 50,
++    '#delta' => 10,
+     '#default_value' => $record->weight,
+-    '#attributes' => array('class' => 'weight'),
++    '#description' => t(''),
+   );
+ 
+   return $form;
+@@ -185,6 +173,7 @@ function nodereview_configure() {
+       $default[] = $type;
+     }
+   }
++  $maxrating = variable_get('nodereview_maxrating', 5);
+   
+   $form['nodereview'] = array(
+     '#type' => 'fieldset',
+@@ -214,10 +203,10 @@ function nodereview_configure() {
+       '#tree' => TRUE,
+   );
+   $form['ratings']['maxrating'] = array(
+-      '#type' => 'textfield',
++      '#type' => 'select',
+       '#title' => t('Maximum Rating'),
+-      '#default_value' => (NODEREVIEW_MAXRATING) ? NODEREVIEW_MAXRATING: 5,
+-      '#description' => t('Allowed values: 1 to 100'),
++      '#options' => drupal_map_assoc(range(1, 10)),
++      '#default_value' => $maxrating,
+   );  
+   
+   $form['ratings']['type'] = array(
+@@ -236,7 +225,7 @@ function nodereview_configure() {
+       '#tree' => TRUE,
+   ); 
+    
+-  for ($i = 1; $i < (NODEREVIEW_MAXRATING + 1); $i++) {
++  for ($i = 1; $i < ($maxrating + 1); $i++) {
+     $form['labels']['label' . $i] = array(
+       '#type' => 'textfield',
+       '#title' => t('Label for rating ' . $i),
+@@ -265,7 +254,7 @@ function nodereview_configure() {
+       '#type' => 'select',
+       '#title' => t('Number of stars'),
+       '#options' => drupal_map_assoc(range(1, 10)),
+-      '#default_value' => NODEREVIEW_MAXRATING,
++      '#default_value' => variable_get('nodereview_maxrating', 5),
+     );
+   }
+   */
+@@ -280,17 +269,11 @@ function nodereview_configure() {
+ 
+ function nodereview_configure_submit($form, $form_state) {
+   $form_values = $form_state['values'];
+-  if (($form_values['ratings']['maxrating'] > 100) || !is_numeric($form_values['ratings']['maxrating'])) {
+-    $maxrating = 5;
+-    drupal_set_message(t('Your maximum value not allowed.'), 'error', TRUE);
+-  }
+-  else {
+-    $maxrating = $form_values['ratings']['maxrating'];
+-  }
+-  variable_set('nodereview_maxrating', $maxrating);
++  variable_set('nodereview_maxrating', $form_values['ratings']['maxrating']);
+   variable_set('nodereview_rating_type', $form_values['ratings']['type']);
++  $maxrating = variable_get('nodereview_maxrating', 5);
+     
+-  for ($i = 1; $i < (NODEREVIEW_MAXRATING + 1); $i++) {
++  for ($i = 1; $i < ($maxrating + 1); $i++) {
+     variable_set('nodereview_rating_label' . $i, $form_values['labels']['label' . $i]);
+   }   
+   foreach ($form_values['types'] as $type => $checked) {
+diff --git a/nodereview.info b/nodereview.info
+index 1fa820b..90c7554 100644
+--- a/nodereview.info
++++ b/nodereview.info
+@@ -4,9 +4,9 @@ dependencies[] = votingapi
+ dependencies[] = views
+ core = 6.x
+ 
+-; Information added by drupal.org packaging script on 2011-07-31
+-version = "6.x-1.0-beta1"
++; Information added by drupal.org packaging script on 2011-04-16
++version = "6.x-1.x-dev"
+ core = "6.x"
+ project = "nodereview"
+-datestamp = "1312126019"
++datestamp = "1302914321"
+ 
+diff --git a/nodereview.install b/nodereview.install
+index d3efb2c..5843424 100644
+--- a/nodereview.install
++++ b/nodereview.install
+@@ -46,7 +46,7 @@ function nodereview_uninstall() {
+  */
+ function nodereview_update_1() {
+   $ret = array();
+-  db_add_field($ret, 'nodereview_axes', 'description_required', array('description' => t('Whether or not a vote description is required.'), 'type' => 'int', 'size' => 'tiny', 'not null' => TRUE, 'default' => 0));  return $ret;
++  db_add_field(&$ret, 'nodereview_axes', 'description_required', array('description' => t('Whether or not a vote description is required.'), 'type' => 'int', 'size' => 'tiny', 'not null' => TRUE, 'default' => 0));  return $ret;
+ }
+ 
+ /**
+@@ -118,7 +118,6 @@ function nodereview_schema() {
+         'default' => '',
+         'description' => t('The decsription about the axes.'),
+       ),
+-      
+       'description_required' => array(
+         'type' => 'int',
+         'not null' => TRUE,
+diff --git a/nodereview.module b/nodereview.module
+index 0200b3e..65f8685 100644
+--- a/nodereview.module
++++ b/nodereview.module
+@@ -2,9 +2,7 @@
+ 
+ define('NODEREVIEW_FIVESTAR_ENABLE', module_exists('fivestar') && (variable_get('nodereview_rating_type', '') == 'fivestar'));
+ define('NODEREVIEW_LABEL_ENABLE', (variable_get('nodereview_rating_type', '') == 'label'));
+-define('NODEREVIEW_MAXRATING', variable_get('nodereview_maxrating', 5));
+ 
+-        
+ if(!function_exists("node_object_prepare")) {
+   include_once(drupal_get_path('module', 'node') . '/node.pages.inc');
+  }
+@@ -315,11 +313,6 @@ function node_add_review_load($arg) {
+   $add_review = FALSE;
+   $current_node = node_load($arg);
+   $type = $current_node->type;
+-  //check to see if the nodereview form should be embedded. If it should, just
+-  //return FALSE immediately becuase there is no point querying the DB.
+-  if(variable_get('nodereview_embed_'. $type, 0) == 1 ) {
+-    return $add_review;
+-  }
+   $axes_count = db_result(db_query("SELECT COUNT(*) FROM {nodereview_axes} WHERE node_type='%s'", $type));
+   if (variable_get('nodereview_use_' . $type, 0) && $axes_count) {
+     $add_review = db_result(db_query("SELECT n.nid FROM {node} n INNER JOIN {nodereview} nr ON n.nid=nr.nid WHERE uid=%d AND reviewed_nid=%d", $user->uid, $arg));
+@@ -337,12 +330,7 @@ function node_edit_review_load($arg) {
+   global $user;
+   $edit_review = FALSE;
+   $current_node = node_load($arg);
+-  $type = $current_node->type;
+-  //check to see if the nodereview form should be embedded. If it should, just
+-  //return FALSE immediately becuase there is no point querying the DB.
+-  if(variable_get('nodereview_embed_'. $type, 0) == 1 ) {
+-    return $edit_review;
+-  }
++  $type =$current_node->type;
+   $axes_count = db_result(db_query("SELECT COUNT(*) FROM {nodereview_axes} WHERE node_type='%s'", $type));
+   if (variable_get('nodereview_use_' . $type, 0) && $axes_count) {
+     $edit_review = db_result(db_query("SELECT n.nid FROM {node} n INNER JOIN {nodereview} nr ON n.nid=nr.nid WHERE uid=%d AND reviewed_nid=%d", $user->uid, $arg));
+@@ -388,68 +376,39 @@ function nodereview_nodeapi(&$node, $op, $teaser, $page) {
+     if (variable_get('nodereview_use_' . $node->type, 0)) { 
+ 
+       //Get node id, tags and value for this node
+-      $result = db_query("SELECT vote_id, value, uid FROM {votingapi_vote} WHERE content_id = %d", $node->nid);  
++      $result = db_query("SELECT content_id, tag, value FROM {votingapi_vote} WHERE content_id = %d", $node->nid);  
+     
+       $votes = array();   
+       $total_value = '';                                               
+       
+       while ($record = db_fetch_object($result)) {
+-        $votes[] = $record->vote_id;
++        $thisnode[] = $record->content_id;
+         $total_value += $record->value;
+-        $users[$record->uid] = 1;
++        $all_tags[$record->tag] = 1;
+       } 
+-      if (!empty($total_value)) {  
+-
+-        $vote_count = count($votes);
+-        //print $vote_count . ' votes <br />';
+-        //print $total_value . ' total value <br />';
+-        $user_count = count($users);
+-        //print $user_count . ' users <br />';
+-        $total = round($total_value / count($votes));
+-        //print $total . ' avarage <br />';
+-        $maxrating_proportion = round(($total/100) * NODEREVIEW_MAXRATING);
+-        //print $maxrating_proportion . ' maxrating proportion <br />';
+-        //print NODEREVIEW_MAXRATING . ' maxrating (global)';
+-        
++      if (!empty($total_value)) {   
++        $total = round($total_value / count($thisnode));
++
+         if (NODEREVIEW_FIVESTAR_ENABLE) {
+-          $total = round($total_value/$vote_count) . '%';
++          $total = $total . '%';
+         }
+         elseif (NODEREVIEW_LABEL_ENABLE) {
+-          $total = variable_get('nodereview_rating_label' . $maxrating_proportion, '');
+-          if (!$total) drupal_set_message(t('You have no assigned label rating on your settings.'), 'error', TRUE);      
++          $total = variable_get('nodereview_rating_label' . round($total/10), '');
+         }
+         else {
+-          $total = $maxrating_proportion . '/' . NODEREVIEW_MAXRATING;
++          $maxrating = variable_get('nodereview_maxrating', 5);
++          $total = $total/10 . '/' . $maxrating;
+         }
+-
+         $node->content['review_total'] = array(
+-          '#prefix' => '<div class="box nodereview-average-rating"><h2><span class="label">Average Review Rating:</span> ',
+-          '#suffix' => '</h2><h3>Total Reviews: ' . $user_count . '</h3></div> ',
++          '#prefix' => '<div class="box nodereview-average-rating"><h2><span class="label">Gemiddelde beoordeling:</span> ',
++          '#suffix' => '</h2><h3>Total Reviews: ' . count($thisnode) / count($all_tags) . '</h3></div> ',
+           '#value' => $total, 
+           '#weight' => 0,
+         );
++ 
++        break; 
+       }
+-    }
+-    
+-    //Check to see if this node type should have embedded reviews and that the user
+-    //has accesss to submit reviews.
+-    if (variable_get('nodereview_embed_'. $node->type, 0) == 1 && user_access('submit reviews')) {
+-      $existing_review = db_fetch_object(db_query("SELECT uid FROM {node} WHERE type = '%s' and uid = %d", 'nodereview', $user->uid));
+-      //If there is no existing review, embed the node_add form for nodereviews.
+-      //If there is an existing review and the user has access to edit own reviews, load the review and pass it to node_page_edit.
+-      if (!$existing_review) {
+-        $node->content['nodereview_form'] = array(
+-          '#value' => node_add('nodereview'),
+-          '#weight' => '5',
+-        );
+-      } elseif ($existing_review && user_access('edit own reviews')) {
+-        $edit_review = db_result(db_query("SELECT n.nid FROM {node} n INNER JOIN {nodereview} nr ON n.nid=nr.nid WHERE uid=%d AND reviewed_nid=%d", $user->uid, $node->nid));
+-        $node->content['nodereview_form'] = array(
+-          '#value' => node_page_edit(node_load($edit_review)),
+-          '#weight' => '5',
+-        );
+-      }
+-    }
++    }   
+     break;
+   }
+ }
+diff --git a/nodereview.theme.inc b/nodereview.theme.inc
+index 06495e9..016c74e 100644
+--- a/nodereview.theme.inc
++++ b/nodereview.theme.inc
+@@ -28,23 +28,13 @@ function theme_nodereview_configure_axes($form) {
+     $row[] = drupal_render($form['axes'][$key]['description']);
+     $row[] = drupal_render($form['axes'][$key]['description_required']);
+     $row[] = drupal_render($form['axes'][$key]['weight']);
+-    $rows[] = array(
+-      'data' => $row,
+-      'id' => 'nodereview-row-'. $key,
+-      'class' => 'draggable tabledrag-leaf',
+-    );    
+-    
+-    
++    $rows[] = $row;
+   }
+-  
+ 
+-  $header = array('Use', 'Name', 'Description', 'Require Vote Comments', 'Weight');
++  $header = array('use', 'name', 'description', 'require vote comments', 'weight');
+ 
+   // This is how we get the table to be "inside" the fieldset
+-  $form['axes']['#children'] = theme('table', $header, $rows, array('id' => 'nodereview-axes'));
+-  
+-  //OPTIONS: drupal_add_tabledrag($table_id, $action, $relationship, $group, $subgroup = NULL, $source = NULL, $hidden = TRUE, $limit = 0);
+-  drupal_add_tabledrag('nodereview-axes', 'order', 'group', 'weight', NULL, NULL, FALSE);
++  $form['axes']['#children'] = theme('table', $header, $rows);
+ 
+   $output .= drupal_render($form);
+   return $output;
+@@ -59,19 +49,17 @@ function theme_nodereview_configure_axes($form) {
+ 
+ function theme_nodereview_review_body($review, $node) {
+   //Logger::debug_var('review', $review);
+-
+-  $maxrating_proportion = round(($review['score']/100) * NODEREVIEW_MAXRATING);
+-      
++  $maxrating = variable_get('nodereview_maxrating', 5);
+   $fivestar = '';
+   $title = $review['tag'];
+   if (NODEREVIEW_FIVESTAR_ENABLE) {
+-    $fivestar = theme('fivestar_static', $review['score'], NODEREVIEW_MAXRATING);
++    $fivestar = theme('fivestar_static', $review['score'], variable_get('nodereview_maxrating', 5));
+   }
+   elseif (NODEREVIEW_LABEL_ENABLE) {
+-    $title .= ' ' . variable_get('nodereview_rating_label' . $maxrating_proportion, '');
++    $title .= ' ' . variable_get('nodereview_rating_label' . round($review['score']/10), '');
+   }  
+   else {
+-    $title .= ': ' . $maxrating_proportion . '/' . NODEREVIEW_MAXRATING;
++    $title .= ': ' . $review['score']/10 . '/' . $maxrating;
+   }
+   $output = theme('box', $title, $fivestar . $review['review']);
+ 
+@@ -87,19 +75,17 @@ function theme_nodereview_review_body($review, $node) {
+ 
+ function theme_nodereview_review_preview($review, $node) {
+   $output = '';
+-
+-  $maxrating_proportion = round(($review['score']/100) * NODEREVIEW_MAXRATING);
+-    
++  $maxrating = variable_get('nodereview_maxrating', 5);
+   $title = $review['tag'];
+   $fivestar = '';
+   if (NODEREVIEW_FIVESTAR_ENABLE) {
+     $fivestar = theme('fivestar_static', $review['score']);
+   }
+   elseif (NODEREVIEW_LABEL_ENABLE) {
+-    $title .= ' ' . variable_get('nodereview_rating_label' . $maxrating_proportion, '');
++    $title .= ' ' . variable_get('nodereview_rating_label' . round($review['score']/10), '');
+   }
+   else {
+-    $title .= ': ' . $maxrating_proportion . '/' . NODEREVIEW_MAXRATING;
++    $title .= ': ' . $review['score']/10 . '/' . $maxrating;
+   }
+   $output = theme('box', $title, $fivestar . check_markup($review['review'], $node->format));
+ 
+@@ -117,28 +103,28 @@ function theme_nodereview_review_preview($review, $node) {
+ function theme_nodereview_teaser($node) {
+   $output = '';
+   static $header;
+-  
++  $maxrating = variable_get('nodereview_maxrating', 5);
+   // Presumably teaser will be called multiple times on different nodes
+   // on the same page, so static cache the static strings
+   if (!isset($header)) {
+     $header = array(t('axis'), t('score'), t('review'));
+   }
+-
++  $count=0;
+   foreach ($node->reviews as $review) {
+-    $maxrating_proportion = round(($review['score']/100) * NODEREVIEW_MAXRATING);
++    $count++;
+     $row = array();
+     $row[] = $review['tag'];
+     if (NODEREVIEW_FIVESTAR_ENABLE) {
+-      $row[] = theme('fivestar_static', $review['score'], NODEREVIEW_MAXRATING);
++      $row[] = theme('fivestar_static', $review['score'], variable_get('nodereview_maxrating', 5));
+     }
+     elseif (NODEREVIEW_LABEL_ENABLE) {
+-      $row[] = variable_get('nodereview_rating_label' . $maxrating_proportion, '');
++      $row[] = variable_get('nodereview_rating_label' . round($review['score']/10), '') ;
+     }      
+     else {
+-      $row[] = $maxrating_proportion . '/' . NODEREVIEW_MAXRATING;
++      $row[] = $review['score']/10 . '/' . $maxrating;
+     }
+     $row[] = truncate_utf8($review['review'], 50, TRUE, TRUE);
+-    $rows[] = $row;
++    $rows[] = array('data'=> $row, 'class'=>'row'.$count);
+   }
+ 
+   $output .= theme('table', $header, $rows, array('class' => 'review-teaser'));
+diff --git a/nodereview_node_nodereview.inc b/nodereview_node_nodereview.inc
+index d2fe342..7c64be3 100644
+--- a/nodereview_node_nodereview.inc
++++ b/nodereview_node_nodereview.inc
+@@ -89,22 +89,24 @@ function nodereview_form(&$node) {
+ //function _nodereview_form_review(&$form, $axis, $reviews, $votes) {
+ function _nodereview_form_review(&$form, $axis, $node) {
+   
+-  $average_rating = round(NODEREVIEW_MAXRATING/2) * 10;
+-  
+-  for ($i = 1; $i < (NODEREVIEW_MAXRATING + 1); $i++) {
+-    $option_value = round(($i/NODEREVIEW_MAXRATING) * 100);
++  $maxrating = variable_get('nodereview_maxrating', 5);
++
++  $average_rating = round($maxrating/2) * 10;
++
++  for ($i = 1; $i < ($maxrating + 1); $i++) {
+     if (NODEREVIEW_LABEL_ENABLE) {
+-      $options[$option_value] = variable_get('nodereview_rating_label' . $i, '');
++      $options[$i * 10] = variable_get('nodereview_rating_label' . $i, '');; 
+     } 
+     else {
+-      $options[$option_value] = $i;
++      $options[$i * 10] = $i;
+     }
+   }
+   
+   $form['reviews'][$axis->aid] = array(
+     '#type' => 'fieldset',
++    '#attributes' => array('class' => 'a'.$axis->aid), 
+     '#title' => $axis->tag,
+-    '#collapsible' => TRUE,
++    '#collapsible' => FALSE,
+     '#collapsed' => FALSE,
+   );
+ 
+@@ -119,7 +121,7 @@ function _nodereview_form_review(&$form, $axis, $node) {
+ 
+   if (NODEREVIEW_FIVESTAR_ENABLE) {
+     $form['reviews'][$axis->aid]['score']['#type'] = 'fivestar';
+-    $form['reviews'][$axis->aid]['score']['#stars'] = NODEREVIEW_MAXRATING;
++    $form['reviews'][$axis->aid]['score']['#stars'] = variable_get('nodereview_maxrating', 5);
+   }
+ 
+   //the #required field now looks at the field we've added to the database indicating whether 
+@@ -178,13 +180,10 @@ function nodereview_load($node) {
+     $votes[$vote['tag']] = $vote;
+   }
+ 
+-
+   $additions->reviews = array();
+   $result = db_query('SELECT nr.aid, tag, review FROM {nodereview_reviews} nr INNER JOIN {nodereview_axes} na ON nr.aid=na.aid WHERE nid = %d ORDER BY na.weight, na.tag', $node->nid);
+   while ($record = db_fetch_object($result)) {
+     // Add in the numeric scores
+-    //$record->score = $votes[$record->tag]['value'];
+-    // issue: http://drupal.org/node/1215138
+     $record->score = $votes[substr($record->tag,0,64)]['value'];
+     $additions->reviews[$record->aid] = (array)$record;
+   }
+@@ -222,12 +221,13 @@ function nodereview_save_reviews($node) {
+   foreach ($node->reviews as $aid => $review) {
+     // Save the text review
+     db_query("INSERT INTO {nodereview_reviews} (nid, aid, review) VALUES (%d, %d, '%s')", $node->nid, $aid, $review['review']);
+-
++    
+     // And use the votingapi to save the score
+     $votes[] = array('value' => $review['score'], 'tag' => $axes[$aid], 'content_type' => 'node', 'content_id' => $node->reviewed_nid);
+ 
+   }
+   //  votingapi_set_vote('node', $node->reviewed_nid, $votes, $node->uid);
++  //  drupal_set_message(print_r($votes,1));
+   votingapi_set_votes($votes);
+ }
+ 
+@@ -283,7 +283,6 @@ function nodereview_view($node, $teaser = FALSE, $page = FALSE) {
+   }
+   else {
+     $node = node_prepare($node, $teaser);
+-
+     // Do a markup check on the fields
+     for ($i=0; $i < $num_aids; $i++) {
+       $node->reviews[$aids[$i]]['review'] = check_markup($node->reviews[$aids[$i]]['review']);

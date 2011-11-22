@@ -1,0 +1,14 @@
+name = User Import
+description = Import users into Drupal from a CSV file.
+core = 6.x 
+
+
+
+
+
+; Information added by drupal.org packaging script on 2011-10-02
+version = "6.x-3.0-beta2"
+core = "6.x"
+project = "user_import"
+datestamp = "1317556608"
+

@@ -1,0 +1,207 @@
+<?php
+
+/**
+ * @file content_clone_field.module
+ * Allows administrators to clone CCK fields.
+ */
+
+/**
+ * Implementation of hook_menu().
+ * @return void
+ */
+function content_clone_field_menu() {
+  $items = array();
+
+  foreach (node_get_types() as $type) {
+    $type_name = $type->type;
+    $content_type = content_types($type_name);
+    $type_url_str = $content_type['url_str'];
+
+    $contexts = content_build_modes('_tabs');
+
+    // Cast as an array in case this is called before any fields have
+    // been added, like when a new content type is created.
+    foreach ((array) $content_type['fields'] as $field) {
+      $field_name = $field['field_name'];
+      $items['admin/content/node-type/'. $type_url_str .'/fields/'. $field_name .'/clone'] = array(
+        'title' => 'Clone field',
+        'page callback' => 'drupal_get_form',
+        'page arguments' => array('content_clone_field_clone_form', $type_name, $field_name),
+        'access arguments' => array('administer content types'),
+        'type' => MENU_CALLBACK,
+      );
+    }
+  }
+
+  return $items;
+}
+
+/**
+ * Implementation of hook_form_alter(). Adds a "Clone field" link to a
+ * field's configuration page.
+ *
+ * @param array $form
+ * @param array $form_state
+ * @param string $form_id
+ * @return void
+ */
+function content_clone_field_form_alter(&$form, &$form_state, $form_id) {
+  if ($form_id != 'content_field_edit_form') {
+    return;
+  }
+
+  $node_type = str_replace('_', '-', $form['#field']['type_name']);
+  $field_name = $form['#field']['field_name'];
+  $clone_url = 'admin/content/node-type/'. $node_type .'/fields/'.
+    $field_name .'/clone';
+  $form['clone_link'] = array(
+    '#weight' => 50,
+    '#type' => 'markup',
+    '#value' => l(t('Clone field'), $clone_url),
+  );
+}
+
+/**
+ * Menu callback. Display a from for cloning an existing CCK field.
+ *
+ * @param  $form_state
+ * @param  $type_name
+ * @param  $field_name
+ * @return array
+ */
+function content_clone_field_clone_form(&$form_state, $type_name, $field_name) {
+  $form = array();
+
+  $field = content_fields($field_name, $type_name);
+
+  $form['old_field_name'] = array(
+    '#type' => 'value',
+    '#value' => $field_name,
+  );
+
+  $form['old_field_name_markup'] = array(
+    '#type' => 'markup',
+    '#title' => t('Current field name'),
+    '#value' => $field_name,
+  );
+
+  $form['type_name'] = array(
+    '#type' => 'value',
+    '#value' => $type_name,
+  );
+
+  $form['new_field_name'] = array(
+    '#type' => 'textfield',
+    '#title' => t('New field name'),
+    '#default_value' => substr($field_name, -(strlen($field_name) - 6)),
+    '#required' => TRUE,
+  );
+
+  $form['new_label'] = array(
+    '#type' => 'textfield',
+    '#title' => t('New label'),
+    '#default_value' => $field['widget']['label'],
+    '#required' => TRUE,
+  );
+
+  $form['submit'] = array(
+    '#type' => 'submit',
+    '#value' => t('Clone'),
+  );
+
+  return $form;
+}
+
+/**
+ * Form validation.
+ *
+ * @param  $form
+ * @param  $form_state
+ * @return void
+ */
+function content_clone_field_clone_form_validate($form, &$form_state) {
+  $values = $form_state['values'];
+  $old_field_name = $values['old_field_name'];
+  $type_name = $values['type_name'];
+
+  $new_field_name = $values['new_field_name'];
+  $new_label = $values['new_label'];
+
+  // No label.
+  if (!$new_label) {
+    form_set_error('new_label', t('Clone field: you need to provide a label.'));
+  }
+
+  // No field name.
+  if (!$new_field_name) {
+    form_set_error('new_field_name', t('Clone field: you need to provide a field name.'));
+  }
+  // Field name validation.
+  else {
+    $new_field_name = $new_field_name;
+
+    // Add the 'field_' prefix.
+    if (substr($new_field_name, 0, 6) != 'field_') {
+      $new_field_name = 'field_'. $new_field_name;
+    }
+
+    // Invalid field name.
+    if (!preg_match('!^field_[a-z0-9_]+$!', $new_field_name)) {
+      form_set_error('new_field_name', t('Clone field: the field name %field_name is invalid. The name must include only lowercase unaccentuated letters, numbers, and underscores.', array('%field_name' => $new_field_name)));
+    }
+    if (strlen($new_field_name) > 32) {
+      form_set_error('new_field_name', t('Clone field: the field name %field_name is too long. The name is limited to 32 characters, including the \'field_\' prefix.', array('%field_name' => $new_field_name)));
+    }
+    // A field named 'field_instance' would cause a tablename clash with {content_field_instance}
+    if ($new_field_name == 'field_instance') {
+      form_set_error('new_field_name', t("Clone field: the name 'field_instance' is a reserved name."));
+    }
+
+    // Field name already exists.
+    // We need to check inactive fields as well, so we can't use content_fields().
+    module_load_include('inc', 'content', 'includes/content.crud');
+    $fields = content_field_instance_read(array(), TRUE);
+    $used = FALSE;
+    foreach ($fields as $existing_field) {
+      $used |= ($existing_field['field_name'] == $new_field_name);
+    }
+    if ($used) {
+      form_set_error('new_field_name', t('Clone field: the field name %field_name already exists.', array('%field_name' => $new_field_name)));
+    }
+  }
+
+}
+
+/**
+ * Submit form.
+ *
+ * @param  $form
+ * @param  $form_state
+ * @return void
+ */
+function content_clone_field_clone_form_submit($form, $form_state) {
+  $values = $form_state['values'];
+  $old_field_name = $values['old_field_name'];
+  $type_name = $values['type_name'];
+
+  $new_field_name = 'field_' . $values['new_field_name'];
+  $new_label = $values['new_label'];
+
+  $field = content_fields($old_field_name, $type_name);
+
+  $field['field_name'] = $new_field_name;
+  $field['widget']['label'] = $new_label;
+
+  // point '_error_element' to the new field
+  foreach($field['widget']['default_value'] as &$thing) {
+    $thing['_error_element'] = str_replace(
+      $old_field_name,
+      $new_field_name,
+      $thing['_error_element']
+    );
+  }
+
+  module_load_include('inc', 'content', 'includes/content.crud');
+  content_field_instance_create($field);
+  drupal_goto('admin/content/node-type/'. str_replace('_', '-', $type_name) .'/fields');
+}

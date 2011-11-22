@@ -1,0 +1,4 @@
+# demo.module snapshots
+# Do not let the webserver serve anything under here!
+#
+Deny from all

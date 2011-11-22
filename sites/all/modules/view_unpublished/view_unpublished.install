@@ -1,0 +1,13 @@
+<?php
+// $Id$
+
+function view_unpublished_install() {
+  //Empty because I didn't include one before.
+}
+
+/**
+ * Make sure that the view_unpublished module runs after other access modules like module_grants.
+*/
+function view_unpublished_update_6000() {
+  db_query("UPDATE {system} SET weight = 1 WHERE name = 'view_unpublished' and type = 'module'");
+}

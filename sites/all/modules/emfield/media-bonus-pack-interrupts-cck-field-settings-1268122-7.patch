@@ -1,0 +1,52 @@
+diff --gitembonus.module embonus.module
+index 31798a3..3009f02 100644
+--- embonus.module
++++ embonus.module
+@@ -13,20 +13,24 @@ function embonus_emfield_widget_settings_extra($op, $widget) {
+       $collect = $collect || module_invoke($module, 'embonus_collect_start_end_times', $widget);
+     }
+   }
+-  if ($collect) {
+-    switch ($op) {
+-      case 'form':
+-        $form = array();
++  
++  switch ($op) {
++    case 'form':
++      $form = array();
++      if ($collect) {
++        //If we are collecting, show our collection form.
+         $form['collect_start_end_times'] = array(
+           '#type' => 'checkbox',
+           '#title' => t('Collect start & end times'),
+           '#description' => t('Some providers may respect start and end times when displaying media. Check this box if you wish to collect that information on a per-instance basis.'),
+           '#default_value' => isset($widget['collect_start_end_times']) ? $widget['collect_start_end_times'] : FALSE,
+         );
+-        return $form;
+-      case 'save':
+-        return array('collect_start_end_times');
+-    }
++      }
++      return $form;
++    case 'save':
++      //Keep an empty array in tact, if we are not collecting, so tht array_merge does not bail out.
++      $columns = ($collect) ? array('collect_start_end_times') : array();
++      return $columns;
+   }
+ }
+ 
+diff --git a/sites/all/modules/contrib/emfield/emfield.cck.inc b/sites/all/modules/contrib/emfield/emfield.cck.inc
+index 6480ebf..d0180fa 100644
+--- a/sites/all/modules/contrib/emfield/emfield.cck.inc
++++ b/sites/all/modules/contrib/emfield/emfield.cck.inc
+@@ -160,7 +160,9 @@ function _emfield_emfield_widget_settings($op, $widget, $module) {
+     case 'save':
+       $columns = array('providers');
+       foreach (module_implements('emfield_widget_settings_extra') as $module) {
+-        $columns = array_merge($columns, module_invoke($module, 'emfield_widget_settings_extra', 'save', $widget));
++        $settings_extra = module_invoke($module, 'emfield_widget_settings_extra', 'save', $widget);
++        $settings_extra = (!is_array($settings_extra) || empty($settings_extra)) ? array() : $settings_extra;
++        $columns = array_merge($columns, $settings_extra);
+       }
+ 
+       return $columns;

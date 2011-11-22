@@ -1,0 +1,11 @@
+name            = Po Re-Importer
+description     = "During a cron or manual scan, the module checks the MD5 hash of the content of the translation files in the module, theme directories, indexed them and offers you the option to import them"
+core            = 6.x
+dependencies[]  = locale
+package         = Multilanguage
+; Information added by drupal.org packaging script on 2011-02-25
+version = "6.x-1.x-dev"
+core = "6.x"
+project = "po_re_importer"
+datestamp = "1298619971"
+

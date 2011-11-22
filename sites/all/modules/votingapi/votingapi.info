@@ -1,0 +1,10 @@
+name = Voting API
+description = Provides a shared voting API for other modules.
+package = Voting
+core = 6.x
+; Information added by drupal.org packaging script on 2011-04-01
+version = "6.x-2.x-dev"
+core = "6.x"
+project = "votingapi"
+datestamp = "1301617925"
+

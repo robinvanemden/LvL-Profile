@@ -1,0 +1,52 @@
+
+
+Po-Re-Importer 6.x-1.3
+
+23.01.2011
+----------------------
+* #976326 by zilverdistel: Added Re-import translation files for themes.
+
+Po-Re-Importer 6.x-1.2
+
+06.11.2010
+----------------------
+* #930824 by Cyberwolf: Added Move settings to their own page.
+* Removed access check in the Importform.
+
+
+2010-10-11
+----------------------
+* Bug #938628 by Kars-T: Added Remove moved modules from the index.
+
+
+
+Po-Re-Importer 6.x-1.1
+
+2010-05-14
+-----------------------------------
+* Do not show the cron link without the 'administer site configuration' permission
+* Added more UI tests
+* Changed the string 'Translation file: @title' to 'Translation file: @file'
+* Move all access tests into one which makes it faster
+
+2010-05-12
+-----------------------------------
+* Removed submit function for the settings form and replaced it with system_settings_form
+* Backported functions from 7.x which sets all translation files from a langauge as imported 
+  when a language was added.
+* Added a function which delete the translation files from Po-Re-Importer Index 
+  when a language was deleted.
+
+2010-05-11
+-----------------------------------
+* Fixed Undefined index: values in po_re_importer.module on line 289.
+
+* Added Tests
+  - Access Tests
+  - Test - Do not show the UI (Forms) without at least one enabled non-English language
+
+2010-05-03
+-----------------------------------
+* Added CHANGELOG.txt
+* spaches, order of functions
+

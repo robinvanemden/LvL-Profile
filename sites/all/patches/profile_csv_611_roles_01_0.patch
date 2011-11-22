@@ -1,0 +1,34 @@
+Index: profile_csv.module
+===================================================================
+10a11,12
+> /*Patched via Brandon Mathis to include option to print user roles*/
+> 
+117a120,126
+>   $form[$set][PROFILE_CSV_PARAM . 'role'] = array(			//Check box to display user role in doc
+>     '#type'          => 'checkbox',
+>     '#title'         => t('User Role'),
+>     '#return_value'  => 1,
+>     '#default_value' => variable_get(PROFILE_CSV_PARAM .'role', 0),
+>   );
+>   
+236a246
+>   
+278a289,302
+>   
+>   if (variable_get(PROFILE_CSV_PARAM .'role', 0)) {
+>    	/* Find every role user $uid has and save that data */
+>    	$value = db_result(db_query("SELECT GROUP_CONCAT(`name` SEPARATOR '; ') as roles FROM {users_roles} u INNER JOIN {role} r ON r.rid = u.rid WHERE u.uid = %d GROUP BY u.uid", $uid));
+>     
+>    	if (isset($value) && !empty($value)) {
+>   	  $user['roles'] = $value;
+>     } else {
+>       $user['roles'] = '';
+>     }
+>     
+>   }
+>   
+334a359,362
+>   if (variable_get(PROFILE_CSV_PARAM .'role', 0)) {			//print User Role column title
+>   	$row[] = '"' . t('roles') . '"';
+>   }
+>   

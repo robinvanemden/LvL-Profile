@@ -1,0 +1,962 @@
+<?php
+
+/**
+ * @file
+ * po_re_importer.module
+ */
+
+define('PO_RE_IMPORTER_NOT_IMPORTED', 0);
+define('PO_RE_IMPORTER_IMPORTED', 1);
+
+/**
+ * Implementation of hook_cron().
+ */
+function po_re_importer_cron() {
+  _po_re_importer_delete_outdated_entries();
+  if (time() - variable_get('po_re_importer_cron_last', 0) >= variable_get('po_re_importer_cron', 604800)) {
+    _po_re_importer_update_index();
+    variable_set('po_re_importer_cron_last', time());
+  }
+}
+
+/**
+ * Implementation of hook_enable().
+ */
+function po_re_importer_enable() {
+  if (!variable_get('po_re_importer_first_run', 0)) {
+    drupal_set_message(t('Po-Re-Importer was successfully enabled. You can find the settings page !here.', array('!here' => l('here', 'admin/build/translate/poreimporter'))));
+  }
+}
+
+/**
+ * Implementation of hook_menu().
+ *
+ * @return array $items
+ */
+function po_re_importer_menu() {
+  $items = array();
+  $items['admin/build/translate/poreimporter'] = array(
+    'title'            => 'Po-Re-Importer',
+    'description'      => 'Import new translations files or scan manually for new translations files.',
+    'page callback'    => 'po_re_importer_page',
+    'access arguments' => array('administer languages'),
+    'type'             => MENU_LOCAL_TASK,
+    'weight'           => 5,
+  );
+  $items['admin/build/translate/poreimporter/import'] = array(
+    'title'            => 'Import',
+    'access arguments' => array('administer languages'),
+    'type'             => MENU_DEFAULT_LOCAL_TASK,
+    'weight'           => 1,
+  );
+  $items['admin/build/translate/poreimporter/settings'] = array(
+    'title'            => 'Settings',
+    'page callback'    => 'drupal_get_form',
+  	'page arguments'   => array('po_re_importer_settings_form'),
+    'access arguments' => array('administer languages'),
+    'type'             => MENU_LOCAL_TASK,
+    'weight'           => 2,
+  );
+  $items['_po_re_importer_get_projects_js'] = array(
+    'page callback' => '_po_re_importer_get_projects_js',
+    'access arguments' => array('administer languages'),
+    'type' => MENU_CALLBACK,
+  );
+  return $items;
+}
+
+/**
+ * Callback admin/build/translate/poreimporter.
+ *
+ * @return string The Page for admin/build/translate/poreimporter.
+ */
+function po_re_importer_page() {
+  //get language
+  $languages = po_re_importer_language_list();
+  $output = '';
+  // show only the form, if min one non-English language found
+  if ($languages) {
+    if (isset($_GET['rebuildindex'])) {
+      _po_re_importer_rebuild_index();
+    }
+    if (variable_get('po_re_importer_first_run', 0)) {
+      po_re_importer_cron();
+      variable_del('po_re_importer_first_run');
+    }
+    // get the totals of translation files
+    $totalpos = _po_re_importer_file_count(PO_RE_IMPORTER_NOT_IMPORTED);
+
+    if ($totalpos == 0) {
+      $new_po = FALSE;
+      $output .= '<p>'. _po_re_importer_no_data() . '</p>';
+    }
+    else {
+      $new_po = TRUE;
+      // if there new translation files inform the user about it
+      $output .= _po_re_importer_file_count_msg($totalpos);
+    }
+    $importedfiles  = _po_re_importer_file_count(PO_RE_IMPORTER_IMPORTED);
+    if (($new_po || $importedfiles) && variable_get('po_re_importer_show_index', 0)) {
+      $output .= drupal_get_form('po_re_importer_table_form', $languages, TRUE);
+    }
+    // get forms
+    $output .= drupal_get_form('po_re_importer_import_form', $new_po);
+    $output .= drupal_get_form('po_re_importer_rebuild_form');
+  }
+  // it is only english enabled
+  else {
+    $output .= _po_re_importer_no_non_english_langauge_found();
+  }
+  return $output;
+}
+
+function _po_re_importer_no_non_english_langauge_found($textonly = FALSE) {
+  if (!$textonly) {
+    $enable_language = l('languages page', 'admin/settings/language');
+    $add_language = l('add new language', 'admin/settings/language/add');
+  }
+  else{
+    $enable_language = 'languages page';
+    $add_language = 'add new language';
+  }
+  //No non-English , so t() makes no sense
+  $text = 'No non-English languages found. To import translation files, please enable at least one non-English language on the ' . $enable_language . ' or ' . $add_language ;
+  if ($textonly) {
+    return $text;
+  }
+  return '<div class="warning">' . $text . '</div>';
+}
+
+/**
+ * Build the two tables, which show the stored index of already/not yet already imported
+ * translations files per language.
+ *
+ * @param array $form_state
+ * @param array $languages
+ * @param bool $open TRUE|FALSE
+ *
+ * @return array $form
+ */
+function po_re_importer_table_form($form_state, $languages, $open = TRUE) {
+  $form = array();
+  $form['table'] = array(
+    '#type'          => 'fieldset',
+    '#title'         => t('Po-Re-Importer index'),
+    '#collapsed'     => $open ? FALSE : TRUE,
+    '#collapsible'   => TRUE,
+  );
+
+  foreach ($languages as $langcode => $langname) {
+    $table = _po_re_importer_table_new($langcode);
+    if ($table) {
+      $form['table']['new'][$langcode] = array(
+        '#type'          => 'fieldset',
+        '#title'         => $langname .' - '. t('Not yet imported'),
+        '#collapsed'     => TRUE,
+        '#collapsible'   => TRUE,
+      );
+      $form['table']['new'][$langcode]['tablecontentnew'] = array(
+       '#value'          => $table,
+      );
+    }
+    $table = _po_re_importer_table_old($langcode);
+    if ($table) {
+      $form['table']['old'][$langcode] = array(
+        '#type'          => 'fieldset',
+        '#title'         => $langname .' - '. t('Already imported'),
+        '#collapsed'     => TRUE,
+        '#collapsible'   => TRUE,
+      );
+      $form['table']['old'][$langcode]['tablecontentold'] = array(
+        '#value'         => $table,
+      );
+    }
+  }// foreach
+  return $form;
+}
+
+/**
+ * Build the form to import the translation files.
+ *
+ * @param array $form_state
+ * @param bool $new_po[optional]
+ * @return array $form
+ */
+function po_re_importer_import_form($form_state, $new_po = FALSE) {
+  include_once './includes/locale.inc';
+  $form = $discriptions = array();
+
+  // all enabled languages e.g. array('fr' => 'French')
+  $languages  = po_re_importer_language_list();
+  // string e.g. de
+  $defaultlanguage = po_re_importer_language_list(TRUE);
+  $language = isset($languages[$defaultlanguage]) ? $defaultlanguage : '';
+  // needed for ahah-api
+  $language = isset($form_state['values']['language']) ? $form_state['values']['language'] : $language;
+
+  $options = array('' => t('--Choose one option--'));
+
+  if (variable_get('po_re_importer_textgroups', 0) && ($components = _po_re_importer_file_count(FALSE, $language)) && $language) {
+    $options += array('del' => t('Delete and import'));
+    $discriptions[] = t('Delete and import - See the description below the checkbox %checkboxlabel', array('%checkboxlabel' => t('Clean up textgroups in database before reimport')));
+  }
+
+  if ($new_po && ($components = _po_re_importer_file_count(PO_RE_IMPORTER_NOT_IMPORTED, $language)) && $language) {
+    $options += array('allnew' => t('All components') .' - '. t('Not yet imported'));
+    $options += _po_re_importer_get_projects(PO_RE_IMPORTER_NOT_IMPORTED, $language, 'name, name_ui');
+    $discriptions[] = t('All components - all translations which not yet imported will be imported.');
+  }
+  elseif (variable_get('po_re_importer_imported_files', 0) && ($components = _po_re_importer_file_count(PO_RE_IMPORTER_IMPORTED, $language)) && $language) {
+    $options += array('all' => t('All components') .' - '. t('Already imported'));
+    $options += _po_re_importer_get_projects(PO_RE_IMPORTER_IMPORTED, $language, 'name, name_ui');
+    $discriptions[] = t('All components - all translations which already imported will be once again imported.');
+  }
+
+  if (count($options) == 1) {
+    $options = array('nothing' => t('There is nothing to import'));
+  }
+
+  $form['js'] = array(
+    '#type' => 'value',
+    '#value' => FALSE,
+  );
+  $form['#cache'] = FALSE;
+  $form['language'] = array(
+    '#type'          => 'select',
+    '#title'         => t('Import into'),
+    '#default_value' => $language,
+    '#required'      => TRUE,
+    '#options'       => array('' => t('--Choose the language--')) + $languages,
+    '#ahah'          => array(
+      'event'   => 'change',
+      'path'    => '_po_re_importer_get_projects_js',
+      'wrapper' => 'po_re_importer_get_projects_js_wrapper',
+    ),
+  );
+  $form['components'] = array(
+    '#type'          => 'select',
+    '#title'         => t('Component'),
+    '#default_value' => '',
+    '#required'      => TRUE,
+    '#options'       => $options,
+    '#description'   => theme('item_list', $discriptions),
+    '#prefix'        => '<div id="po_re_importer_get_projects_js_wrapper">',
+    '#suffix'        => '</div>',
+  );
+  $form['textgroup'] = array(
+    '#type'          => 'radios',
+    '#title'         => t('Text group'),
+    '#default_value' => 'default',
+    '#options'       => module_invoke_all('locale', 'groups'),
+    '#description'   => t('Imported translations will be added to this text group.'),
+  );
+  $form['import_mode'] = array(
+    '#type'          => 'radios',
+    '#title'         => t('Mode'),
+    '#default_value' => LOCALE_IMPORT_KEEP,
+    '#options'       => array(
+      LOCALE_IMPORT_OVERWRITE => t('Strings in the imported file(s) replace existing ones, new ones are added'),
+      LOCALE_IMPORT_KEEP => t('Existing strings are kept, only new strings are added')
+    ),
+  );
+  $form['submit'] = array(
+    '#type'   => 'submit',
+    '#value'  => t('Import'),
+  );
+  return $form;
+}
+
+/**
+ * Validation of po_re_importer_import_form().
+ *
+ * @param array $form
+ * @param array $form_state
+ */
+function po_re_importer_import_form_validate($form, &$form_state) {
+  include_once './includes/locale.inc';
+  if ($form_state['values']['js']) {
+    return;
+  }
+  // Form Api validate empty values
+  if (empty($form_state['values']['language']) || empty($form_state['values']['components'])) {
+    return;
+  }
+  elseif ($form_state['values']['components'] == 'nothing') {
+    return form_set_error('', t('There is nothing to import.') .' '. _po_re_importer_rebuild_link());
+  }
+  elseif (in_array($form_state['values']['components'], array('all', 'del'))) {
+    if (!($components = _po_re_importer_file_count(FALSE, $form_state['values']['language']))) {
+      return form_set_error('components', t('This component do not have translation files in this language.') .' '. _po_re_importer_rebuild_link());
+    }
+  }
+  elseif ($form_state['values']['components'] == 'allnew') {
+    if (!($components = _po_re_importer_file_count(PO_RE_IMPORTER_NOT_IMPORTED, $form_state['values']['language']))) {
+      return form_set_error('language', t('There are no new translation files in this language.'));
+    }
+  }
+  return;
+}
+
+/**
+ * Submit handler of po_re_importer_import_form().
+ *
+ * @param array $form
+ * @param array $form_state
+ */
+function po_re_importer_import_form_submit($form, &$form_state) {
+  if ($form_state['values']['js']) {
+    return;
+  }
+
+  $modus           = $form_state['values']['import_mode'];
+  $component       = $form_state['values']['components'];
+  $language        = $form_state['values']['language'];
+  $textgroup       = $form_state['values']['textgroup'];
+  $textgroupdelete = variable_get('po_re_importer_textgroups', 0) ? TRUE : FALSE;
+  $items           = array();
+  if (in_array($component, array('all', 'del'))) {
+    $components = _po_re_importer_get_projects(NULL, $language, 'name', TRUE);
+    $items = array_keys($components);
+    if ($batch = po_re_importer_batch_check_files($items, $language, $textgroup, $modus, 'po_re_importer_batch_import_finished')) {
+      batch_set($batch);
+    }
+    if ($modul == 'del') {
+      // Clean out all translations first if user asked to do that.
+      db_query("DELETE FROM {locales_target} WHERE language = '%s' AND lid IN (SELECT lid FROM {locales_source} WHERE textgroup = '%s')", $language, $textgroup);
+      // Also remove all source strings without translations.
+      db_query("DELETE FROM {locales_source} WHERE lid NOT IN (SELECT lid FROM {locales_target})");
+    }
+
+  }// end elseif
+  elseif ($component == 'allnew') {
+    $components = _po_re_importer_get_projects(PO_RE_IMPORTER_NOT_IMPORTED, $language, 'name', TRUE);
+    $items = array_keys($components);
+    if ($batch = po_re_importer_batch_check_files($items, $language, $textgroup, $modus, 'po_re_importer_batch_import_finished')) {
+      batch_set($batch);
+    }
+  }// end elseif
+  else{
+    $query = db_query("SELECT * FROM {po_re_importer} WHERE langcode = '%s' AND name = '%s'", $language, $component);
+
+    while ($item = db_fetch_object($query)) {
+      $items[] = $item->name;
+    }//end while
+
+    if ($batch = po_re_importer_batch_check_files($items, $language, $textgroup, $modus, 'po_re_importer_batch_import_finished')) {
+      batch_set($batch);
+    }
+  }// end else
+}// end po_re_importer_form_submit().
+
+/**
+ * Form with a submit button to rebuild the Po-Re-Importer index.
+ *
+ * @param array $form_state
+ *
+ * @return array $form
+ */
+function po_re_importer_rebuild_form($form_state) {
+  $form = array();
+  $form['rebuild'] = array(
+    '#type'         => 'fieldset',
+    '#title'        => t('Rebuild the index'),
+    '#collapsed'    => TRUE,
+    '#collapsible'  => TRUE,
+  );
+  $form['rebuild']['submit'] = array(
+    '#type'         => 'submit',
+    '#value'        => t('Rebuild the index'),
+    '#submit'       => array('_po_re_importer_rebuild_index'),
+  );
+  $form['rebuild']['description'] = array(
+    '#type'         => 'item',
+    '#description'  => t('Rebuild the index - all translations directories inside the modules, themes and so on directories will scan and updated/new translation files will include in the Po-Re-Importer index.'),
+  );
+  return $form;
+}
+
+/**
+ * Page callback for the path admin/build/translate/poreimporter/settings.
+ *
+ * @param array $form_state
+ *
+ * @return array $form
+ */
+function po_re_importer_settings_form($form_state) {
+  $form = array();
+  $form['po_re_importer_cron'] = array(
+    '#type'          => 'select',
+    '#title'         => t('Check interval for translation files'),
+    '#description'   => t('This interval setting defines how often cron will re-check the status of translationfiles.'),
+    '#default_value' => variable_get('po_re_importer_cron', 604800),
+    '#options'       => drupal_map_assoc(array(86400, 172800, 259200, 604800, 1209600, 2419200, 4838400), 'format_interval'),
+  );
+  $form['po_re_importer_imported_files'] = array(
+    '#type'          => 'checkbox',
+    '#title'         => t('Check this if you want also already imported translation files in the select list'),
+    '#default_value' => variable_get('po_re_importer_imported_files', 0),
+  );
+  $form['po_re_importer_textgroups'] = array(
+    '#type'          => 'checkbox',
+    '#title'         => t('Clean up textgroups in database before reimport'),
+    '#description'   => t('If checked, all translations for the given language and selected textgroups will be deleted from the database first, and you will loose all your customized translations and those not available in the files being imported. Use with extreme caution. If you want do this, check this checkbox and choose the option %deloption.', array('%deloption' => t('Delete and import.'))),
+    '#default_value' => variable_get('po_re_importer_textgroups', 0),
+  );
+  $form['po_re_importer_show_index'] = array(
+    '#type'          => 'checkbox',
+    '#title'         => t('Show the index'),
+    '#description'   => t('If checked, you get an overview of all already imported translation files and not yet imported translation files.'),
+    '#default_value' => variable_get('po_re_importer_show_index', 0),
+  );
+  return system_settings_form($form);
+}
+
+/**
+ * Return the default language or a array with all non-English languages.
+ *
+ * @param bool $default - if TRUE return the default
+ * @return array $language_list
+ */
+function po_re_importer_language_list($default = FALSE) {
+  if ($default) {
+    return language_default('language');
+  }
+  $language_list = locale_language_list('name');
+  //we do not need english
+  unset($language_list['en']);
+  if (count($language_list) > 0) {
+    return $language_list;
+  }
+  return array();
+}
+
+/**
+ * UI-Text if there are no new translation files.
+ *
+ * @return string
+ */
+function _po_re_importer_no_data() {
+  $timestamplast = variable_get('po_re_importer_cron_last', 0);
+  $timestampnext = $timestamplast + variable_get('po_re_importer_cron', 604800);
+  $timelast      = format_date($timestamplast, 'medium');
+  $timenext      = format_date($timestampnext, 'medium');
+  $cron = t('Cron');
+  if (user_access('administer site configuration')) {
+    $cron = l(t('Cron'), 'admin/reports/status/run-cron', array('query' => drupal_get_destination()));
+  }
+  $output = '<p>' . t('There are no new translation files in the index to import.') . '</p>';
+  $output .= '<p>' . t('At next !cron (last index - %time / next index - %time2) the Po-Re-Importer will scan for new translation files and include them in the index. Alternatively, choose another option from the select list.', array(
+  '!cron' => $cron, '%time' => $timelast, '%time2' => $timenext )) . '</p>';
+
+  return $output;
+}
+
+/**
+ * A Query builder to count the already imported or not yet imported translation files.
+ *
+ * @param mixed $imported
+ *  - PO_RE_IMPORTER_NOT_IMPORTED: count the not yet imported translation files
+ *  - PO_RE_IMPORTER_IMPORTED: count the already imported translation files
+ *  - FALSE: both PO_RE_IMPORTER_NOT_IMPORTED and PO_RE_IMPORTER_IMPORTED
+ * @param string $language - language code
+ * @return int
+ */
+function _po_re_importer_file_count($imported = FALSE, $langcode = '') {
+  $where = $args = array();
+  $sql = "SELECT COUNT(*) FROM {po_re_importer}";
+
+  if ($imported !== FALSE) {
+    $where[] = " imported = %d ";
+    $args[] = $imported;
+  }
+
+  if ($langcode) {
+    $where[] = " langcode = '%s' ";
+    $args[] = $langcode;
+  }
+  if (!empty($where)) {
+    $sql .= ' WHERE ' . implode(' AND ', $where);
+  }
+
+  return (int)db_result(db_query($sql, $args));
+}
+
+/**
+ *
+ * @param int $count
+ * @return string the format_plural() message
+ */
+function _po_re_importer_file_count_msg($count) {
+  return format_plural($count, 'There is a new translation file in the index to import.' , 'There are @count new translation files in the index to import.');
+}
+
+/**
+ * Build the table, which show the not yet imported translation files.
+ *
+ * @param string $langcode
+ * @return string
+ */
+function _po_re_importer_table_new($langcode) {
+  $output = '';
+  $rows = $header = array();
+  $components = _po_re_importer_get_projects(PO_RE_IMPORTER_NOT_IMPORTED, $langcode, $select = 'name, name_ui, filepath', TRUE);
+  foreach ($components as $component) {
+    $row = array();
+    $row[] = $component->name_ui;
+    $row[] = $component->filepath;
+    $rows[] = array('data' => $row);
+  }
+  if (count($rows)) {
+    $header = array(t('Component'), t('Translation file'));
+    $output .= theme('table', $header, $rows);
+  }
+
+  return $output;
+}
+
+/**
+ * Build the table, which show the already imported translation files.
+ *
+ * @param string $langcode
+ * @return string
+ */
+function _po_re_importer_table_old($langcode) {
+  $output = '';
+  $rows = $header = array();
+  $components = _po_re_importer_get_projects(PO_RE_IMPORTER_IMPORTED, $langcode, $select = 'name, name_ui, filepath, importtime', TRUE, $order = ' ORDER BY importtime DESC');
+  foreach ($components as $component) {
+    $row = array();
+    $row[] = $component->name_ui;
+    $row[] = $component->filepath;
+    $row[] = format_date($component->importtime, 'medium');
+    $rows[] = array('data' => $row);
+  }
+
+  if (count($rows)) {
+    $header = array(t('Component'), t('Translation file'), t('Import time'));
+    $output .= theme('table', $header, $rows);
+  }
+
+  return $output;
+}
+
+/**
+ * A query builder to query different information from the database.
+ *
+ * @param int $imported
+ * - PO_RE_IMPORTER_IMPORTED: To get all already imported projects.
+ * - PO_RE_IMPORTER_NOT_IMPORTED: To get not yet imported projects.
+ * - NULL: To get not yet/already imported projects.
+ * @param string $language
+ * @param string $select
+ * @param bool $allinfos
+ * @param string $order
+ *
+ * @return array $components
+ */
+function _po_re_importer_get_projects($imported = NULL, $language = NULL, $select = '*', $allinfos = FALSE, $order = ' ORDER BY name ASC') {
+    $components = $where = $args = array();
+
+    $sql = 'SELECT';
+    if (!empty($select)) {
+      $sql .= ' '. $select . ' ';
+    }
+    $sql .= ' FROM {po_re_importer} ';
+    if ($imported !== NULL) {
+      $where[] = " imported = %d";
+      $args[] = $imported;
+    }
+    if ($language !== NULL) {
+      $where[] = " langcode = '%s'";
+      $args[] = $language;
+    }
+
+    if (!empty($where)) {
+      $sql .= ' WHERE ' . implode(' AND ', $where);
+    }
+    if ($order !== NULL) {
+      $sql .= $order;
+    }
+    $query = db_query($sql, $args);
+    while ($item = db_fetch_object($query)) {
+      $components[$item->name] = $allinfos ? $item : $item->name_ui;
+    }// end while
+
+  return $components;
+}
+
+/**
+ * Get the component informations from the system table to get the human readable name
+ * of a component.
+ *
+ * @param string $componentname
+ * @return array $componentinfos
+ */
+function _po_re_importer_get_projects_infos($componentname = '') {
+  static $componentinfos = array();
+  if (empty($componentinfos)) {
+    $SQL = 'SELECT s.info, po.name FROM {system} s LEFT JOIN {po_re_importer} po ON s.name = po.name WHERE s.status = 1';
+    if (!empty($componentname)) {
+      $SQL .= ' AND s.name = "%s"';
+    }
+    $query = db_query($SQL, $componentname);
+    while ($item = db_fetch_object($query)) {
+      $componentinfos[$item->name] = $item;
+    }
+  }
+  return $componentinfos;
+}
+
+/**
+ * Unpack the serialized database field info from the system table and return
+ * the human readable name of component if available.
+ *
+ * @param string $componentname
+ * @return string $componentname
+ */
+function _po_re_importer_get_project_human_name($componentname) {
+  $SQL = 'SELECT s.info FROM {system} s WHERE s.status = 1 AND s.name = "%s"';
+  $result = db_fetch_object(db_query($SQL, $componentname));
+
+  $componentinfo = drupal_unpack($result, 'info');
+  return isset($componentinfo->name) ? $componentinfo->name : $componentname;
+}
+
+/**
+ * Receives the incoming request by ahah and return the changed form.
+ */
+function _po_re_importer_get_projects_js() {
+  if (empty($_POST)) {
+    drupal_goto();
+  }
+  $form_state = array('storage' => NULL, 'submitted' => FALSE, 'rebuild' => TRUE);
+  $form_build_id = $_POST['form_build_id'];
+  $form = form_get_cache($form_build_id, $form_state);
+  $args = $form['#parameters'];
+  $form_id = array_shift($args);
+  $form_state['post'] = $form['#post'] = $_POST;
+  $form['#programmed'] = $form['#redirect'] = FALSE;
+  // set to TRUE, so we can check that in *_validate() and *_submit()
+  $form['js'] = array('#type' => 'value', '#value' => TRUE);
+
+  drupal_process_form($form_id, $form, $form_state);
+  $form = drupal_rebuild_form($form_id, $form_state, $args, $form_build_id);
+  $components_options = $form['components'];
+  unset($components_options['#prefix'], $components_options['#suffix']);
+  $output = theme('status_messages') . drupal_render($components_options);
+  // Final rendering callback.
+  drupal_json(array('status' => TRUE, 'data' => $output));
+}
+
+/**
+ * A link to rebuild the po-re-importer index.
+ *
+ * @return string
+ */
+function _po_re_importer_rebuild_link() {
+  return l(t('Rebuild the Po-Re-Importer Index.'), 'admin/build/translate/poreimporter', array('query' => array('rebuildindex' => 1)));
+}
+
+/**
+ *
+ * @param array $components
+ * @param string $langcode
+ * @param string $textgroup
+ * @param int $modus
+ * @param string $finished
+ */
+function po_re_importer_batch_check_files($components, $langcode, $textgroup, $modus, $finished) {
+    $files = array();
+    // Collect all files to import for all $components.
+    $result = db_query("SELECT s.name, s.filename FROM {system} s WHERE s.status = 1");
+    while ($component = db_fetch_object($result)) {
+      if (in_array($component->name, $components)) {
+        // Collect all files for this component in all enabled languages, named
+        // as $langcode.po or with names ending with $langcode.po. This allows
+        // for filenames like node-module.de.po to let translators use small
+        // files and be able to import in smaller chunks.
+        $files = array_merge($files, file_scan_directory(dirname($component->filename) .'/translations', '(^|\.)('. $langcode .')\.po$', array('.', '..', 'CVS'), 0, FALSE));
+      }
+    }
+    return po_re_importer_batch_build($files, $textgroup, $modus, $components, $finished);
+}
+
+/**
+ *
+ * @param array $files
+ * @param string $textgroup
+ * @param string $modus
+ * @param array $components
+ * @param string $finished
+ */
+function po_re_importer_batch_build($files, $textgroup, $modus, $components = array(), $finished = NULL) {
+
+  if (count($files)) {
+    $operations = array();
+
+    foreach ($files as $file) {
+      // We call po_re_importer_batch_import for every batch operation.
+      $operations[] = array('po_re_importer_batch_import', array($file->filename, $textgroup, $modus));
+    }
+    $batch = array(
+      'operations'    => $operations,
+      'title'         => t('Importing interface translations'),
+      'init_message'  => t('Starting import'),
+      'error_message' => t('Error importing interface translations'),
+      'file'          => './includes/locale.inc',
+      '#components'   => $components,
+      );
+    if (isset($finished)) {
+      $batch['finished'] = $finished;
+    }
+    return $batch;
+  }
+  return FALSE;
+}
+
+/**
+ *
+ * @param string $filepath
+ * @param string $textgroup
+ * @param string $modus
+ * @param array $context
+ */
+function po_re_importer_batch_import($filepath, $textgroup, $modus, &$context) {
+  // The filename is either {langcode}.po or {prefix}.{langcode}.po, so
+  // we can extract the language code to use for the import from the end.
+
+  if (preg_match('!(/|\.)([^\./]+)\.po$!', $filepath, $langcode) && file_exists($filepath)) {
+
+    $file = (object) array('filepath' => $filepath, 'filename' => $filepath);
+    $return = _locale_import_read_po('db-store', $file, $modus, $langcode[2], $textgroup);
+
+    if ($return !== FALSE) {
+      db_query("UPDATE {po_re_importer} SET imported = 1, importtime = %d WHERE filepath = '%s'", time(), $filepath);
+      $context['results'][] = $filepath;
+      list($headerdone, $additions, $updates, $deletes, $skips) = _locale_import_one_string('db-report');
+      $text = t('The translation was successfully imported. There are %number newly created translated strings, %update strings were updated and %delete strings were removed.', array('%number' => $additions, '%update' => $updates, '%delete' => $deletes));
+      $context['message'] = t('Translation file: @file', array('@file' => $filepath)) .'<br />'. $text;
+    }
+    else{
+      $context['message'] = t('Translation file: @file', array('@file' => $filepath)) .'<br />'. t('The translation file was not imported.');
+    }
+  }
+}
+
+/**
+ * Write a watchdog entry if successful translations files was imported and
+ * show a message about the result.
+ *
+ * @param bool $success
+ * @param array $results
+ */
+function po_re_importer_batch_import_finished($success, $results) {
+  if ($success) {
+    if (count($results) == 1) {
+      watchdog('locale', 'The following translation file has been imported: @files', array('@files' => implode(', ', $results)));
+    }
+    else {
+      watchdog('locale', 'The following translation files have been imported: <pre>@files</pre>', array('@files' => print_r($results, TRUE)));
+    }
+    drupal_set_message(format_plural(count($results), 'One translation file imported.', '@count translation files imported.'));
+    cache_clear_all('locale:', 'cache', TRUE);
+  }
+}
+
+/**
+ * Helperfunction.
+ */
+function _po_re_importer_rebuild_index() {
+  _po_re_importer_update_index();
+  variable_set('po_re_importer_cron_last', time());
+  drupal_set_message(t('Po Re-Importer Index rebuilded.'));
+  drupal_goto('admin/build/translate/poreimporter');
+}
+
+/**
+ * Implementation of hook_form_alter().
+ *
+ * @param array $form
+ * @param array $form_state
+ * @param string $form_id
+ */
+function po_re_importer_form_alter(&$form, &$form_state, $form_id) {
+  if ($form_id == 'locale_languages_predefined_form') {
+    $form['#submit'][] = 'po_re_importer_languages_edit_form_submit';
+  }
+  if ($form_id == 'locale_languages_delete_form') {
+    $form['#submit'][] = 'po_re_importer_languages_delete_form_submit';
+  }
+}
+
+/**
+ * Index all translation files for the new language and marks them as imported.
+ *
+ * @param array $form
+ * @param array $form_state
+ */
+function po_re_importer_languages_edit_form_submit($form, $form_state) {
+  _po_re_importer_update_index('install', array(), array($form_state['values']['langcode'] => $form_state['values']['langcode']));
+}
+
+/**
+ * Deletes all rows of the deleted language.
+ *
+ * @param array $form
+ * @param array $form_state
+ */
+function po_re_importer_languages_delete_form_submit($form, $form_state) {
+  db_query('DELETE FROM {po_re_importer} WHERE langcode = "%s"', $form_state['values']['langcode']);
+}
+
+/**
+ * Delete all translation files from disabled components and from components which not in the {system} table.
+ */
+function _po_re_importer_delete_outdated_entries() {
+  //disabled components
+  $query = db_query("SELECT po.name FROM {po_re_importer} po LEFT JOIN {system} s ON po.name = s.name WHERE s.status = 0");
+  while ($result = db_fetch_object($query)) {
+    db_query("DELETE FROM {po_re_importer} WHERE name = '%s'", $result->name);
+  }
+  // components which are not anymore in {system} e.g. with the http://drupal.org/project/system_table_cleaner
+  db_query("DELETE FROM {po_re_importer} WHERE name NOT IN(SELECT name FROM {system})");
+  // moved components
+  $query = db_query("SELECT filepath, name FROM {po_re_importer}");
+  while ($result = db_fetch_object($query)) {
+    if (!file_exists($result->filepath)) {
+      $filename = db_result(db_query("SELECT filename FROM {system} WHERE name = '%s'", $result->name));
+      $newlocation = dirname($filename) . '/translations/' . basename($result->filepath);
+      if (!file_exists($newlocation)) {
+        db_query("DELETE FROM {po_re_importer} WHERE filepath = '%s'", $result->filepath);
+      }
+      else{
+        db_query("UPDATE {po_re_importer} SET filepath = '%s' WHERE filepath = '%s'", $newlocation, $result->filepath);
+      }
+    }
+  }
+}
+
+/**
+ * Iterates through all components and collect for each component the translation files.
+ *
+ * @param array $components
+ * @param array $languages
+ *
+ * @return array $files An array with all file objects.
+ */
+function _po_re_importer_update_index_by_component($components = array(), $languages = array()) {
+
+  $files = array();
+  // run only if there at least one non-English language enabled
+  if (count($languages) && is_array($components)) {
+    // e.g. 0 as block
+    foreach ($components as $component) {
+      // e.g. de as de => Deutsch
+      foreach ($languages as $langcode => $languagename) {
+        $files[] = _po_re_importer_find_translationsfiles($component, $langcode);
+        if ((timer_read('page')/1000) > (ini_get('max_execution_time')/2)) {
+          break; // Stop once we have used over half of the maximum execution time.
+        }
+      }
+      if ((timer_read('page')/1000) > (ini_get('max_execution_time')/2)) {
+        break; // Stop once we have used over half of the maximum execution time.
+      }
+    }
+  }
+
+  if (!empty($files)) {
+    $temp = $files;
+    $files = array();
+    foreach ($temp as $array) {
+      foreach ($array as $key => $file) {
+        $files[] = $file;
+      }
+    }
+    unset($temp);
+  }
+  return $files;
+}
+
+/**
+ * Finds all translation files of a component.
+ *
+ * @param string $component
+ * @param string $langcode
+ *
+ * @return array $files
+ */
+function _po_re_importer_find_translationsfiles($component = '', $langcode = '') {
+  $files = array();
+  if (isset($component) && isset($langcode)) {
+    $componentfilename = db_result(db_query("SELECT filename FROM {system} WHERE name = '%s'", $component));
+    $translationsfiles = file_scan_directory(dirname($componentfilename) .'/translations', '(^|\.)('. $langcode .')\.po$', array('.', '..', 'CVS'), 0, FALSE);
+
+    if (!empty($translationsfiles)) {
+      foreach ($translationsfiles as $file) {
+        $file->langcode = $langcode;
+        $file->name     = $component;
+        $files[]        = $file;
+      }
+    }
+  }
+  return $files;
+}
+
+/**
+ * Scans all translations directories inside the modules, themes and so on directories and save all needed information in the database.
+ */
+function _po_re_importer_update_index($op = 'cron', $components = array(), $languages = array()) {
+  // get language
+  if (empty($languages)) {
+    $languages = po_re_importer_language_list();
+  }
+  // run only if there is a non-English language enabled
+  if (count($languages)) {
+    if (empty($components)) {
+      //get all components
+      $query = db_query("SELECT s.name FROM {system} s WHERE s.status = 1");
+      while ($result = db_fetch_object($query)) {
+        $components[] = $result->name;
+      }
+    }
+    $files = _po_re_importer_update_index_by_component($components, $languages);
+    if (!empty($files)) {
+      foreach ($files as $key => $file) {
+        if (!is_object($file)) {
+          continue;
+        }
+        $result = NULL;
+        $result = db_fetch_object(db_query("SELECT * FROM {po_re_importer} WHERE filepath = '%s'", $file->filename));
+        if ((drupal_strlen($file->name) > 100) || (drupal_strlen($file->filename) > 255)) {
+          continue;
+        }
+        $table              = 'po_re_importer';
+        $record             = new stdClass;
+        $record->name       = $file->name;
+        $record->filepath   = $file->filename;
+        $record->langcode   = $file->langcode;
+        $record->importtime = ($op == 'cron') ? 0 : time();
+        $record->md5hash    = md5_file($file->filename);
+        $record->imported   = ($op == 'cron') ? 0 : 1;
+        $record->name_ui    = _po_re_importer_get_project_human_name($file->name);
+        if (!$result) {
+          drupal_write_record($table, $record);
+          if ($op == 'cron') {
+            watchdog('locale', 'New translation file(s) from the @component component are ready for importing under !url.', array(
+              '@component' => $record->name_ui,
+              '!url' => l(t('Po Re-Importer'), 'admin/build/translate/poreimporter'))
+            );
+          }
+        }
+        elseif ($record->md5hash <> $result->md5hash) {
+          watchdog('locale', 'Updated translation file(s) from the @component component are ready for importing under !url.', array(
+            '@component' => $record->name_ui,
+            '!url' => l(t('Po Re-Importer'), 'admin/build/translate/poreimporter'))
+          );
+          $record->imported = 0;
+          drupal_write_record($table, $record, 'filepath');
+        }
+      } //end foreach ($files as $key => $file) {
+    } // end  if !empty($files)
+  }// end if (count($languages))
+}// end _po_re_importer_update_index().

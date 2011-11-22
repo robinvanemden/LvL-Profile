@@ -1,0 +1,11 @@
+name = Content Clone Field
+description = Clone CCK fields - the clone link is located on each field's
+settings page at admin/content/node-type/[node-type]/fields/[field-name]
+core = 6.x
+package = CCK
+; Information added by drupal.org packaging script on 2011-05-20
+version = "6.x-1.0"
+core = "6.x"
+project = "content_clone_field"
+datestamp = "1305886015"
+

@@ -1,0 +1,19 @@
+
+
+/* Quick Ie7 Fixes */
+#primary-menu, #navigation-right {
+  height:1%;
+}
+#header-blocks {
+  width:500px;
+}
+.white-bg h2.block-title .arrow, .gray-bg h2.block-title .arrow, .light-gradient h2.block-title .arrow {
+  bottom:-5px;
+}
+.node .field-field-image {
+   margin-top:13px;
+}
+#header-group-wrapper {
+  position:relative;
+	z-index:999;
+}

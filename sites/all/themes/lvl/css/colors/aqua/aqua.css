@@ -1,0 +1,14 @@
+
+
+
+/*--------------------------------------------------------------*/
+/* Colors
+/-------------------------------------------------------------- */
+/* Default link styles - separate a:visited for a different visited link style */
+a, a:link, a:visited {
+  color:#009394;
+}
+/* Hover/active link styles. Don't forget :focus for accessibility */
+a:hover, a:focus, a:active {
+  color:#009394;
+}

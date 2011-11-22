@@ -1,0 +1,49 @@
+<?php
+
+/**
+ * @file
+ * The Views Ticker module.
+ *
+ * The views ticker module allows creation of ticker from existing views.
+ *
+ */
+
+/**
+ * Implementation of hook_views_api()
+ * @return Array with Views API version.
+ */
+function views_ticker_views_api() {
+  return array('api' => 2.0);
+}
+
+function template_preprocess_views_ticker_style_unformatted(&$vars) {
+  $view       = $vars['view'];
+  $result     = $vars['rows'];
+  $fields   = &$view->field;
+  
+  $vars['rows'] = array();
+
+  $options  = $view->style_plugin->options;
+  $js_data = array(
+    'views_ticker' => array(
+      'startDelay' => $options['startDelay'],
+      'placeHolder' => $options['placeHolder'],
+    ),
+  );
+  drupal_add_js($js_data, 'setting');
+
+  $renders = array();
+  $keys = array_keys($view->field);
+  foreach ($result as $count => $row) {
+    foreach ($keys as $id) {
+      $renders[$count][$id] = $view->field[$id]->theme($row);
+    }
+    $vars['rows'][$count] = implode(" ", $renders[$count]);
+  }
+
+  // Include proper javascripts
+  $module_path = drupal_get_path('module', 'views_ticker');
+  drupal_add_js("$module_path/js/jquery.newsTicker.js");
+  drupal_add_js("$module_path/js/views_ticker.js");
+  
+}

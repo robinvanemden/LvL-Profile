@@ -1,0 +1,108 @@
+; $Id: city magazine.info $
+
+name = City Magazine
+description = An ultimate and attractive powerful fixed/fluid width layout theme. Its based on 16 Column grid providing awesome flexibilty and theme settings.
+screenshot = screenshot.png
+base theme = fusion_core
+core = 6.x
+engine = phptemplate
+
+stylesheets[all][] = css/advanced-typography.css
+stylesheets[all][] = css/city_magazine.css
+
+regions[sidebar_first] = sidebar first
+regions[sidebar_last] = sidebar last
+regions[header_top] = header top
+regions[header] = header
+regions[navigation_right] = navigation right
+regions[preface_upper_top] = preface upper top
+regions[preface_top] = preface top
+regions[preface_bottom] = preface bottom
+regions[content_top] = content top
+regions[content] = content
+regions[content_bottom] = content bottom
+regions[postscript_top] = postscript top
+regions[postscript_bottom_top] = postscript bottom top
+regions[postscript_bottom] = postscript bottom
+regions[footer] = footer
+regions[node_top] = node top
+regions[node_bottom] = node bottom
+
+features[] = logo
+features[] = name
+features[] = slogan
+features[] = node_user_picture
+features[] = comment_user_picture
+features[] = search
+features[] = favicon
+features[] = primary_links
+features[] = secondary_links
+
+; Default theme settings
+settings[theme_grid] = grid16-960
+settings[theme_grid_options][] = grid16-960
+settings[theme_grid_options][] = grid16-fluid
+settings[fluid_grid_width] = fluid-100
+settings[theme_font_size] = font-size-12
+settings[sidebar_layout] = sidebars-split
+settings[sidebar_first_width] = 3
+settings[sidebar_last_width] = 3
+settings[theme_color_style] = red
+settings[theme_background] = red
+
+; Inherit Skinr styles from Fusion Core
+skinr[options][inherit_skins] = true
+
+; Disable 12 column grid block widths inherited from fusion_core
+skinr[grid12-width] = true
+
+; Block Theme
+skinr[block-title-color][title] = Select block theme for this block
+skinr[block-title-color][type] = select
+skinr[block-title-color][features][] = block
+skinr[block-title-color][options][1][label] = Box border with solid white background
+skinr[block-title-color][options][1][class] = white-bg
+skinr[block-title-color][options][2][label] = Box border with solid light gray background
+skinr[block-title-color][options][2][class] = gray-bg
+skinr[block-title-color][options][3][label] = Box border with light gradient background
+skinr[block-title-color][options][3][class] = light-gradient
+
+; Block Title Color
+skinr[block-theme][title] = Select block title color for this block
+skinr[block-theme][type] = select
+skinr[block-theme][features][] = block
+skinr[block-theme][options][1][label] = aquamarine
+skinr[block-theme][options][1][class] = aquamarine
+skinr[block-theme][options][2][label] = ash
+skinr[block-theme][options][2][class] = ash
+skinr[block-theme][options][3][label] = blue
+skinr[block-theme][options][3][class] = blue
+skinr[block-theme][options][4][label] = brown
+skinr[block-theme][options][4][class] = brown
+skinr[block-theme][options][5][label] = gray
+skinr[block-theme][options][5][class] = gray
+skinr[block-theme][options][6][label] = green
+skinr[block-theme][options][6][class] = green
+skinr[block-theme][options][7][label] = limegreen
+skinr[block-theme][options][7][class] = limegreen
+skinr[block-theme][options][8][label] = navyblue
+skinr[block-theme][options][8][class] = navyblue
+skinr[block-theme][options][9][label] = orange
+skinr[block-theme][options][9][class] = orange
+skinr[block-theme][options][10][label] = pink
+skinr[block-theme][options][10][class] = pink
+skinr[block-theme][options][11][label] = red
+skinr[block-theme][options][11][class] = red
+skinr[block-theme][options][12][label] = teal
+skinr[block-theme][options][12][class] = teal
+skinr[block-theme][options][13][label] = violet
+skinr[block-theme][options][13][class] = violet
+skinr[block-theme][options][14][label] = yellow
+skinr[block-theme][options][14][class] = yellow
+
+; Information added by drupal.org packaging script on 2010-02-14
+version = "6.x-1.0-rc1"
+core = "6.x"
+project = "fusion"
+datestamp = "1266132306"
+

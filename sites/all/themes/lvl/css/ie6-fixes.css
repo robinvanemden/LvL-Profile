@@ -1,0 +1,66 @@
+
+/* PNG Fix */
+#block-search-0 .form-item, #block-search-0 .form-submit, #block-views-contact_bottom_form-block_1 .webform-component-textarea .form-item, #block-views-contact_bottom_form-block_1 .form-item, .head-shadow { /* Cropped background images */
+ behavior:expression((this.runtimeStyle.behavior="none")&&(this.pngSet?this.pngSet=true:(this.nodeName == "IMG" && this.src.toLowerCase().indexOf('.png')>-1?(this.runtimeStyle.backgroundImage = "none", this.runtimeStyle.filter = "progid:DXImageTransform.Microsoft.AlphaImageLoader(src='" + this.src + "', sizingMethod='image')", this.src = "images/blank.gif"):(this.origBg = this.origBg? this.origBg :this.currentStyle.backgroundImage.toString().replace('url("', '').replace('")', ''), this.runtimeStyle.filter = "progid:DXImageTransform.Microsoft.AlphaImageLoader(src='" + this.origBg + "', sizingMethod='crop')", this.runtimeStyle.backgroundImage = "none")), this.pngSet=true) );
+}
+#block-views-contact_bottom_form-block_1 .webform-component-textfield {
+  background: url(../images/contact-form-bg-ie.png) right top no-repeat;
+}
+#block-views-contact_bottom_form-block_1 .webform-component-textarea {
+  background: url(../images/contact-form-textarea-bg-ie.png) right top no-repeat;
+}
+#block-search-0 .form-submit {
+  background-image:url(../images/search-bg-ie.png)
+}
+.view-front-featured .views-field-field-image-fid span.image-mask {
+  display:none;
+}
+
+#ddblock-number-pager-1, .view-front-featured .views-field-field-teaser-description-value {
+  background:#000000;
+}
+.white-bg h2.block-title .arrow, .gray-bg h2.block-title .arrow, .light-gradient h2.block-title .arrow {
+  display:block;
+  position:absolute;
+	top:26px;
+	bottom:inherit
+}
+/*** Navigation Quick Fix ***/
+#navigation-right, #navigation-right div {
+	display:inline;
+	float:right;
+}
+#navigation-right {
+	width:200px;
+}
+#primary-menu, #primary-menu div  {
+	width:830px;
+	display:inline;
+}
+#block-search-0 .form-item {
+  margin-right:10px;
+}
+#block-search-0 {
+	position:relative;
+	left:-10px;
+}
+#header-blocks {
+  width:500px;
+}
+.node .field-field-image {
+  margin-top:13px;
+}
+#ddblock-number-pager-1 a:link, #ddblock-number-pager-1 a:visited {
+	background-image:url(../images/dd-block-pager-ie.png);
+	margin-right:5px;
+}
+#primary-menu, #navigation-right {
+  height:1%;
+}
+#navigation {
+  overflow:visible !important;
+}
+#header-group-wrapper {
+  position:relative;
+	z-index:999;
+}

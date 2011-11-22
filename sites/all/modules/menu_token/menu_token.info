@@ -1,0 +1,11 @@
+name = Menu Token
+description = "Provides tokens in menu items(links)."
+dependencies[] = token
+core = 6.x
+
+; Information added by drupal.org packaging script on 2011-06-13
+version = "6.x-1.0-alpha2"
+core = "6.x"
+project = "menu_token"
+datestamp = "1307952721"
+

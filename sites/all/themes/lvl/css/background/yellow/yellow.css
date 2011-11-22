@@ -1,0 +1,22 @@
+
+
+
+/*--------------------------------------------------------------*/
+/* Backgrounds
+/-------------------------------------------------------------- */
+/* Glow */
+.header-group-wrapper {
+  background:url(images/header-wrapper-inner-bg.png) center top repeat-x;
+}
+/* Header Repeat */
+.header-group-wrapper-inner {
+  background:url(images/header-wrapper-bg.png) center top no-repeat;
+}
+/* Navigation Background for ie6 */
+* html #navigation, * html #navigation-inner, * html #navigation-sub-inner {
+  background-image:url(images/navigation-bg-ie.png);
+}
+/* Poll */
+.poll .bar .foreground {
+  background-image: url(images/poll_foreground.gif);
+}

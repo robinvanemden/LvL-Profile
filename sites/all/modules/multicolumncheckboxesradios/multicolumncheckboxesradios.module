@@ -1,0 +1,383 @@
+<?php
+// $Id: multicolumncheckboxesradios.module,v 1.39 2010/09/08 23:04:57 mattyoung Exp $
+/**
+ * @file multicolumncheckboxesradios.module
+ * Extends checkboxes/radios form element to have multi-column display option
+ * See README.txt for details
+ */
+
+
+
+
+function multicolumncheckboxesradios_widget_settings_alter(&$v, $op, $widget) {
+  $widget_types = array_merge(array(
+    'optionwidgets_buttons',
+    'content_taxonomy_options',
+    'nodereference_buttons',
+    'userreference_buttons',
+    'select_or_other_buttons',
+  ), variable_get('multicolumncheckboxesradios_extra_widget_types', array()));
+
+  if (in_array($widget['type'], $widget_types) || in_array($widget['widget_type'], $widget_types)) {
+    switch ($op) {
+      case 'form':
+        $v['multicolumncheckboxesradios'] = array(
+          '#type' => 'fieldset',
+          '#title' => t('Multicolumn checkbox/radio buttons widget display settings'),
+          '#description' => t('Adjust settings to display checkbox/radio buttons widget in columns.'),
+          '#collapsible' => TRUE,
+          '#collapsed' => FALSE,
+          '#weight' => 2,
+        );
+        $v['multicolumncheckboxesradios']['mccr_width'] = array(
+          '#type' => 'select',
+          '#title' => t('Columns'),
+          '#options' => array(0 => t('Multi-column off'), 1 => '1', 2 => '2', 3 => '3', 4 => '4', 5 => '5', 6 => '6', 7 => '7', 8 => '8', 9 => '9'),
+          '#default_value' => isset($widget['mccr_width']) ? $widget['mccr_width'] : 1,
+          '#description' => t('The number of columns desired.'),
+        );
+        $v['multicolumncheckboxesradios']['mccr_row-major'] = array(
+          '#type' => 'checkbox',
+          '#title' => t('Row-major'),
+          '#default_value' => isset($widget['mccr_row-major']) ? $widget['mccr_row-major'] : 0,
+          '#description' => t('Select this to display check boxes/radios button across the screen first, then down.'),
+        );
+        $v['multicolumncheckboxesradios']['mccr_indent'] = array(
+          '#type' => 'select',
+          '#title' => t('Indent'),
+          '#options' => array(0 => '0', 1 => '1', 2 => '2', 3 => '3', 4 => '4', 5 => '5', 6 => '6', 7 => '7', 8 => '8'),
+          '#default_value' => isset($widget['mccr_indent']) ? $widget['mccr_indent'] : 0,
+          '#description' => t('The number of indentation desired.'),
+        );
+        $v['multicolumncheckboxesradios']['mccr_caption'] = array(
+          '#type' => 'textfield',
+          '#title' => t('Caption'),
+          '#default_value' => isset($widget['mccr_caption']) ? $widget['mccr_caption'] : '',
+          '#description' => t('Table caption for the multicolumn checkboxes/radios.'),
+        );
+        $v['multicolumncheckboxesradios']['mccr_column-heading'] = array(
+          '#type' => 'textarea',
+          '#title' => t('Column heading'),
+          '#default_value' => isset($widget['mccr_column-heading']) ? $widget['mccr_column-heading'] : '',
+          '#description' => t('The column heading each on a separate line.'),
+        );
+        $v['multicolumncheckboxesradios']['mccr_row-heading'] = array(
+          '#type' => 'textarea',
+          '#title' => t('Row heading'),
+          '#default_value' => isset($widget['mccr_row-heading']) ? $widget['mccr_row-heading'] : '',
+          '#description' => t('The row heading each on a separate line.'),
+        );
+        break;
+      case 'save':
+        $v = array_merge($v, array('mccr_width', 'mccr_row-major', 'mccr_indent', 'mccr_caption', 'mccr_column-heading', 'mccr_row-heading'));
+        break;
+    }
+  }
+}
+
+
+
+function multicolumncheckboxesradios_elements() {
+  return array(
+    'checkboxes' => array(
+      '#multicolumn' => FALSE,
+      '#process' => array('multicolumncheckboxesradios_element_process'),
+    ),
+    'radios' => array(
+      '#multicolumn' => FALSE,
+      '#process' => array('multicolumncheckboxesradios_element_process'),
+    ),
+  );
+}
+
+
+
+/**
+ * Form element process function to add multi-column markup to checkboxes/radios
+ *
+ * @param $element
+ * @return the processed element
+ */
+function multicolumncheckboxesradios_element_process($element, $edit, &$form_state, $form) {
+  // only do this if it's coming from CCK, otherwise, let the normal form element through
+  if (empty($element['#multicolumn']) && isset($form['#field_info'])) {
+    $widget = &$form['#field_info'][$element['#parents'][0]]['widget'];
+    $temp = $widget['mccr_column-heading'];
+    if (!empty($temp)) {
+      $column_heading = explode("\r", trim($temp));
+    }
+    $temp = $widget['mccr_row-heading'];
+    if (!empty($temp)) {
+      $row_heading = explode("\r", trim($temp));
+    }
+    $element['#multicolumn'] = array(
+      'width' => $widget['mccr_width'],
+      'row-major' => $widget['mccr_row-major'],
+      'indent' => $widget['mccr_indent'],
+      'caption' => $widget['mccr_caption'],
+      'column-heading' => $column_heading,
+      'row-heading' => $row_heading,
+    );
+  }
+
+  // if multicolumn option is not set or width parameter is not set, do nothing
+  if (empty($element['#multicolumn']) || empty($element['#multicolumn']['width'])) {
+    return $element;
+  }
+
+
+  $item_total = count($element['#options']) + (!empty($element['#multicolumn']['indent']) ? $element['#multicolumn']['indent'] : 0);
+
+  // in case there are fewer items than the width, then the width is just the
+  // item_total in one row
+  $width = min($item_total, $element['#multicolumn']['width']);
+  // if we end up with no elements, do nothing
+  if ($width < 1) {
+    return $element;
+  }
+
+
+  // copy and unset the checkboxe/radios child elements, we will rearrange them
+  $keys = array_keys($element['#options']);
+  $element_total = count($keys);
+  $copy = array();
+  for ($i = 0 ; $i < $element_total ; ++$i) {
+    $copy[$keys[$i]] = $element[$keys[$i]];
+    unset($element[$keys[$i]]);
+  }
+
+  $space = array(
+        '#type' => 'markup',
+        '#value' => '&nbsp;',
+  );
+
+  if (!empty($element['#multicolumn']['indent'])) {
+    $indent = $element['#multicolumn']['indent'];
+    $spaces = array();
+    for ($i = 0 ; $i < $indent ; ++$i) {
+      $spaces["multicolumncheckboxesradios-space-$i"] = $space;
+    }
+    $copy = $spaces + $copy;
+  }
+
+
+  if (empty($element['#multicolumn']['row-major'])) {
+    $rows = _multicolumncheckboxesradios_chunk_transpose($copy, $width);
+  }
+  else {
+    $rows = array_chunk($copy, $width, TRUE);
+  }
+
+  // fill the last row tail end with space if it's shorter than $width
+  $last_row = &$rows[count($rows) - 1];
+  while (($last_row_size = count($last_row)) < $width) {
+    $last_row["multicolumncheckboxesradios-tail-space-$last_row_size"] = $space;
+  }
+
+  // prepend the row heading in each row
+  $has_row_heading = !empty($element['#multicolumn']['row-heading']);
+  if ($has_row_heading) {
+    $i = 0;
+    $row_count = count($rows);
+    foreach ($element['#multicolumn']['row-heading'] as $h) {
+      if ($i < $row_count) {
+        $rows[$i] = array("multicolumncheckboxesradios-row-heading-$i" => array('#type' => 'markup', '#value' => $h)) + $rows[$i];
+      }
+      else {
+        $rows[$i] = array("multicolumncheckboxesradios-row-heading-$i" => array('#type' => 'markup', '#value' => $h));
+      }
+      ++$i;
+    }
+    for ( ; $i < $row_count ; ++$i) {
+      $rows[$i] = array("multicolumncheckboxesradios-row-heading-$i" => $space) + $rows[$i];
+    }
+  }
+
+
+  $markup = '';
+  $table_class = 'class="multicolumncheckboxesradios-table"';
+  $has_column_heading = !empty($element['#multicolumn']['column-heading']);
+  if ($has_column_heading) {
+    $table_class = 'class="multicolumncheckboxesradios-table sticky-enabled"';
+    drupal_add_js('misc/tableheader.js');
+
+    $markup = _multicolumncheckboxesradios_make_heading_markup($element['#multicolumn']['column-heading'],
+                                                               'multicolumncheckboxesradios-column-heading',
+                                                               'multicolumncheckboxesradios-column-heading-first',
+                                                               'multicolumncheckboxesradios-column-heading-last');
+    if ($has_row_heading) {
+      $markup = '<th class="multicolumncheckboxesradios-heading-corner">&nbsp;</th>' . $markup;
+    }
+
+    $markup = '<thead><tr>' . $markup . '</tr></thead>';
+  }
+
+  $caption = trim($element['#multicolumn']['caption']);
+  if (!empty($caption)) {
+    $markup = '<caption>' . $caption . '</caption>' . $markup;
+  }
+
+  $element['multicolumncheckboxesradios-table-open'] = array(
+    '#type' => 'markup',
+    '#value' => '<table ' . $table_class . '>' . $markup . '<tbody>',
+  );
+
+
+  $flip = array('even' => 'odd', 'odd' => 'even');
+  $class = 'even';
+  foreach ($rows as &$row) {
+    $class = $flip[$class];
+    $keys = array_keys($row);
+    $row_size = count($keys);
+    switch ($row_size) {
+      case 1:
+        if ($has_row_heading) {
+          $row[$keys[0]]['#prefix'] = "<tr class=\"$class\"><td class=\"multicolumncheckboxesradios-row-heading\">";
+          $row[$keys[0]]['#suffix'] = '</td></tr>';
+        }
+        else {
+          $row[$keys[0]]['#prefix'] = "<tr class=\"$class\"><td class=\"multicolumncheckboxesradios-column-first multicolumncheckboxesradios-column multicolumncheckboxesradios-column-last\">";
+          $row[$keys[0]]['#suffix'] = '</td></tr>';
+        }
+        break;
+      case 2:
+        if ($has_row_heading) {
+          $row[$keys[0]]['#prefix'] = "<tr class=\"$class\"><td class=\"multicolumncheckboxesradios-row-heading\">";
+          $row[$keys[0]]['#suffix'] = '</td>';
+          $row[$keys[1]]['#prefix'] = "<td class=\"multicolumncheckboxesradios-column-first multicolumncheckboxesradios-column multicolumncheckboxesradios-column-last\">";
+          $row[$keys[1]]['#suffix'] = '</td></tr>';
+        }
+        else {
+          $row[$keys[0]]['#prefix'] = "<tr class=\"$class\"><td class=\"multicolumncheckboxesradios-column-first multicolumncheckboxesradios-column\">";
+          $row[$keys[0]]['#suffix'] = '</td>';
+          $row[$keys[1]]['#prefix'] = '<td class="multicolumncheckboxesradios-column multicolumncheckboxesradios-column-last">';
+          $row[$keys[1]]['#suffix'] = '</td></tr>';
+        }
+        break;
+      default:
+        if ($has_row_heading) {
+          $row[$keys[0]]['#prefix'] = "<tr class=\"$class\"><td class=\"multicolumncheckboxesradios-row-heading\">";
+          $row[$keys[0]]['#suffix'] = '</td>';
+          $row[$keys[1]]['#prefix'] = '<td class="multicolumncheckboxesradios-column-first multicolumncheckboxesradios-column">';
+          $row[$keys[1]]['#suffix'] = '</td>';
+
+          $end_index = $row_size - 1;
+          for ($i = 2 ; $i < $end_index ; ++$i) {
+            $row[$keys[$i]]['#prefix'] = '<td class="multicolumncheckboxesradios-column">';
+            $row[$keys[$i]]['#suffix'] = '</td>';
+          }
+
+          $row[$keys[$end_index]]['#prefix'] = '<td class="multicolumncheckboxesradios-column multicolumncheckboxesradios-column-last">';
+          $row[$keys[$end_index]]['#suffix'] = '</td></tr>';
+        }
+        else {
+          $row[$keys[0]]['#prefix'] = "<tr class=\"$class\"><td class=\"multicolumncheckboxesradios-column-first multicolumncheckboxesradios-column\">";
+          $row[$keys[0]]['#suffix'] = '</td>';
+
+          $end_index = $row_size - 1;
+          for ($i = 1 ; $i < $end_index ; ++$i) {
+            $row[$keys[$i]]['#prefix'] = '<td class="multicolumncheckboxesradios-column">';
+            $row[$keys[$i]]['#suffix'] = '</td>';
+          }
+          $row[$keys[$end_index]]['#prefix'] = '<td class="multicolumncheckboxesradios-column multicolumncheckboxesradios-column-last">';
+          $row[$keys[$end_index]]['#suffix'] = '</td></tr>';
+        }
+        break;
+    }
+  }
+
+  foreach ($rows as &$row) {
+    foreach ($row as $k => &$v) {
+      $element[$k] = $v;
+    }
+  }
+
+  $element['multicolumncheckboxesradios-table-close'] = array(
+    '#type' => 'markup',
+    '#value' => '</tbody></table>',
+  );
+
+  // default stylesheet
+  drupal_add_css(drupal_get_path('module', 'multicolumncheckboxesradios') .'/multicolumncheckboxesradios.css');
+
+  return $element;
+}
+
+
+/**
+ * Break the 1D array into 2D chunk array, always satify the $width value by
+ * varying the height of each chunk, then transpose it.
+ *
+ * @param array $items element to break up
+ * @param int $width the width
+ * @return array the result in 2D array
+ */
+function _multicolumncheckboxesradios_chunk_transpose($items, $width) {
+  $result = array();
+
+	if ($width == 1) {
+		foreach ($items as $k => &$v) {
+			$result[] = array($k => $v);
+		}
+	}
+  else {
+	  $keys = array_keys($items);
+
+	  $total = count($items);
+	  $counter = 0;
+	  $a = array();
+	  for ($i = 0 ; $i < $width ; ++$i) {
+	    $height = ceil(($total - $counter) / ($width - $i));
+	    $a[$i] = array_slice($keys, $counter, $height);
+	    $counter += $height;
+	  }
+
+	  // transpose
+	  array_unshift($a, NULL);
+	  $b = call_user_func_array('array_map', $a);
+	  // transpose can result in NULL value at the end, clear them
+	  $last_row = &$b[count($b) - 1];
+
+	  while (end($last_row) == NULL) {
+	    array_pop($last_row);
+	  }
+
+	  foreach ($b as $i => &$key_row) {
+	    $key_row = (array) $key_row;
+	    foreach ($key_row as $key) {
+	      $result[$i][$key] = $items[$key];
+	    }
+	  }
+  }
+  return $result;
+}
+
+
+/**
+ * Take an array of string, produce a string of HTML markup of each string as
+ * <div class="regular first">item-first</div><div class="regular">item-n</div>...
+ * <div class="regular last">item-last</div>
+ *
+ * @param array $items string items
+ * @param string $class_regular class name normally
+ * @param string $class_first class name in the first position
+ * @param string $class_last class name in the last position
+ * @return string the HTML markup
+ */
+function _multicolumncheckboxesradios_make_heading_markup($items, $class_regular, $class_first, $class_last) {
+  $i = 1;
+  $total = count($items);
+  $result = '';
+  foreach ($items as $item) {
+    $class_string = $class_regular;
+    if ($i == 1) {
+      $class_string .= ' ' . $class_first;
+    }
+    if ($i == $total) {
+      $class_string .= ' ' . $class_last;
+    }
+    $result .= "<th class=\"$class_string\">$item</th>";
+    ++$i;
+  }
+  return $result;
+}
