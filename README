@@ -6,7 +6,7 @@ http://drupal.org/
 http://drupal.org/project/demo_profile
 
 
-The LvL profile comes with an install profile: a complete package containing all required files to get started with MediaMosa LvL. 
+The LvL profile comes with an install profile: a complete Drupal package containing the database and all files to get you started with MediaMosa LvL. 
 
 Just upload the files to the root directory of your webserver.
 
@@ -40,4 +40,4 @@ Additional info:
 
 
 Robin van Emden - November 2011
-
+Theme Design TTMAD
