@@ -21,7 +21,7 @@ The default username and password of the admin user is:
 Username: LvL  
 Password: lvl
 
-For each role, a demo user has been added. To use them, just change their password when logged in as the admin.
+For each role, a demo user has been added. To use those accounts, just change the password of each account when logged in as admin.
 
 
 You can change the test@test email adresses here:
