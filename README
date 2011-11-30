@@ -21,13 +21,21 @@ The default username and password of the admin user is:
 Username: LvL  
 Password: lvl
 
+
+Now just add your MediaMosa server information (server URL, server username and server password) here:
+http://www.sitename.com/admin/mediamosa/config/connector/list
+
+Click the "test" button, and you should now see a message:
+"Normal call test successful, settings saved."
+
+
 For each role, a demo user has been added. To use those accounts, just change the password of each account when logged in as admin.
 
 
 You can change the test@test email adresses here:
-www.sitename.com/user/1/edit
-www.sitename.com/admin/build/contact/edit/1
-www.sitename.com/admin/settings/site-information
+http://www.sitename.com/user/1/edit
+http://www.sitename.com/admin/build/contact/edit/1
+http://www.sitename.com/admin/settings/site-information
 
 
 Additional info: 
@@ -40,5 +48,5 @@ Additional info:
 
 
 Robin van Emden - November 2011
-Theme Design TTMAD
+Design adaptation by Things To Make And Do
 Commissioned by Lentiz
