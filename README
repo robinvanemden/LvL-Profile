@@ -1,6 +1,11 @@
 A Drupal 6 / MediaMosa client install profile.
 Available under GPL v2  (http://www.gnu.org/licenses/gpl-2.0.html / LICENSE.txt)
 
+Default installed languages: Dutch (English)
+
+Currently updated to Drupal 6.22
+
+
 http://www.mediamosa.org/
 http://drupal.org/
 http://drupal.org/project/demo_profile
